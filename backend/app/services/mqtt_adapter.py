@@ -9,6 +9,7 @@ from app.schemas.mqtt import MqttRelayFeedbackMessage, MqttStatusMessage
 from app.schemas.relay import RelayCommandFeedback
 from app.services.device_service import update_module_status
 from app.services.linkage_service import apply_relay_command_feedback, get_relay_command_by_id
+from app.services.protocol_service import map_feedback_payload
 
 
 def normalize_mqtt_status_payload(payload: dict) -> MqttStatusMessage:
@@ -76,13 +77,20 @@ async def process_mqtt_feedback_message(
         raise ValueError("Relay command not found for incoming MQTT feedback")
 
     # 设备 ACK 会直接回写指令执行状态，后续可继续扩展错误码与重试规则。
+    feedback_result = map_feedback_payload(
+        execution_status=message.execution_status,
+        feedback_status=message.feedback_status,
+        feedback_message=message.feedback_message,
+        error_code=message.error_code,
+    )
+
     updated_command = await apply_relay_command_feedback(
         db,
         command,
         RelayCommandFeedback(
-            execution_status=message.execution_status,
-            feedback_status=message.feedback_status,
-            feedback_message=message.feedback_message,
+            execution_status=feedback_result.execution_status,
+            feedback_status=feedback_result.feedback_status,
+            feedback_message=feedback_result.feedback_message,
         ),
     )
     return updated_command

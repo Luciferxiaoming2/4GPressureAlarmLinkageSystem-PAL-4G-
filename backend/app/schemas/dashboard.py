@@ -42,6 +42,13 @@ class DashboardHome(BaseModel):
     pending_command_count: int
 
 
+class MiniProgramHome(BaseModel):
+    device_count: int
+    online_device_count: int
+    triggered_alarm_count: int
+    pending_command_count: int
+
+
 class MiniProgramDeviceItem(BaseModel):
     device_id: int
     device_name: str
@@ -73,3 +80,41 @@ class DashboardCharts(BaseModel):
     alarm_type_distribution: list[DashboardTrendPoint]
     command_status_distribution: list[DashboardTrendPoint]
     device_status_distribution: list[DashboardTrendPoint]
+
+
+class PaginationMeta(BaseModel):
+    total: int
+    limit: int
+    offset: int
+
+
+class DashboardAlarmPage(BaseModel):
+    items: list[DashboardAlarmItem]
+    pagination: PaginationMeta
+
+
+class DashboardRelayCommandPage(BaseModel):
+    items: list[DashboardRelayCommandItem]
+    pagination: PaginationMeta
+
+
+class MiniProgramAlarmPage(BaseModel):
+    items: list[MiniProgramAlarmItem]
+    pagination: PaginationMeta
+
+
+class DashboardDeviceDetail(BaseModel):
+    device_id: int
+    device_name: str
+    serial_number: str
+    status: str
+    owner_id: int | None
+    linkage_group_id: int | None
+    module_count: int
+    online_module_count: int
+    offline_module_count: int
+    latest_alarm_type: str | None
+    latest_alarm_time: datetime | None
+    device_status: str
+    recent_alarms: list[DashboardAlarmItem]
+    recent_commands: list[DashboardRelayCommandItem]

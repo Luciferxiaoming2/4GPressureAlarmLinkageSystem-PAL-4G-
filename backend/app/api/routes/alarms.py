@@ -15,7 +15,7 @@ from app.services.alarm_service import (
     list_alarm_records,
     recover_alarm_record,
 )
-from app.services.linkage_service import dispatch_linkage_for_alarm
+from app.services.linkage_service import dispatch_linkage_for_alarm, dispatch_recovery_for_alarm
 
 router = APIRouter()
 
@@ -98,4 +98,6 @@ async def recover_alarm(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     alarm = await recover_alarm_record(db, alarm, payload)
+    # 报警恢复后自动尝试下发恢复指令；若用户在报警期间做过手动操作，则恢复逻辑会自动跳过。
+    await dispatch_recovery_for_alarm(db, alarm)
     return AlarmRecordRead.model_validate(alarm)

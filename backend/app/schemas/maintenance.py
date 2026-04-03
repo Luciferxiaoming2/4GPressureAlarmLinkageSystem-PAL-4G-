@@ -20,6 +20,12 @@ class DatabaseBackupResult(BaseModel):
     file_size: int
 
 
+class DatabaseBackupFileRead(BaseModel):
+    backup_file: str
+    file_size: int
+    created_at: datetime
+
+
 class CleanupResult(BaseModel):
     removed_log_directories: int
     removed_backup_directories: int

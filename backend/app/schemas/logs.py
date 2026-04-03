@@ -39,3 +39,27 @@ class CommunicationLogRead(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RuntimeLogPage(BaseModel):
+    total: int
+    items: list[RuntimeLogRead]
+
+
+class OperationLogPage(BaseModel):
+    total: int
+    items: list[OperationLogRead]
+
+
+class CommunicationLogPage(BaseModel):
+    total: int
+    items: list[CommunicationLogRead]
+
+
+class LogsOverview(BaseModel):
+    runtime_total: int
+    runtime_error_count: int
+    operation_total: int
+    operation_failed_count: int
+    communication_total: int
+    communication_failed_count: int

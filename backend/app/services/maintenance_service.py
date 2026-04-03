@@ -8,7 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.job_execution_log import JobExecutionLog
-from app.schemas.maintenance import CleanupResult, DatabaseBackupResult
+from app.schemas.maintenance import (
+    CleanupResult,
+    DatabaseBackupFileRead,
+    DatabaseBackupResult,
+)
 
 
 def _resolve_sqlite_db_path() -> Path:
@@ -82,6 +86,28 @@ async def backup_database() -> DatabaseBackupResult:
         backup_file=str(backup_path),
         file_size=backup_path.stat().st_size,
     )
+
+
+async def list_database_backups(limit: int = 20) -> list[DatabaseBackupFileRead]:
+    root_path = settings.backup_root_path
+    if not root_path.exists():
+        return []
+
+    backup_files: list[DatabaseBackupFileRead] = []
+
+    # 备份清单用于运维确认“哪些备份真实存在”，按文件时间倒序返回。
+    for file_path in root_path.rglob("*.db"):
+        stat = file_path.stat()
+        backup_files.append(
+            DatabaseBackupFileRead(
+                backup_file=str(file_path),
+                file_size=stat.st_size,
+                created_at=datetime.fromtimestamp(stat.st_mtime),
+            )
+        )
+
+    backup_files.sort(key=lambda item: item.created_at, reverse=True)
+    return backup_files[:limit]
 
 
 def _cleanup_dated_directories(root_path: Path, retention_days: int) -> int:

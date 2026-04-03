@@ -17,5 +17,6 @@ class MqttRelayFeedbackMessage(BaseModel):
     execution_status: str = Field(pattern="^(dispatched|success|failed|queued)$")
     feedback_status: str = Field(default="device_ack", max_length=32)
     feedback_message: str | None = None
+    error_code: str | None = Field(default=None, max_length=64)
     serial_number: str | None = Field(default=None, min_length=1, max_length=128)
     module_code: str | None = Field(default=None, min_length=1, max_length=32)

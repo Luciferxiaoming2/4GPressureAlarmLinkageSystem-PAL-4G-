@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,16 +12,49 @@ from app.schemas.alarm import AlarmLinkageDispatchResult
 from app.schemas.relay import RelayCommandCreate, RelayCommandFeedback, RelayRetryResult
 
 
-async def dispatch_linkage_for_alarm(
+async def _get_trigger_module_with_device(
     db: AsyncSession,
     alarm: AlarmRecord,
-) -> AlarmLinkageDispatchResult:
-    trigger_module_stmt = (
+) -> Module | None:
+    stmt = (
         select(Module)
         .options(selectinload(Module.device).selectinload(Device.linkage_group))
         .where(Module.id == alarm.module_id)
     )
-    trigger_module = (await db.execute(trigger_module_stmt)).scalar_one_or_none()
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def _get_linkage_target_modules(
+    db: AsyncSession,
+    trigger_module: Module,
+) -> tuple[list[Module], str]:
+    # 联动优先按设备组生效；没有分组时再回退到同设备内其他模块。
+    if trigger_module.device and trigger_module.device.linkage_group_id:
+        stmt = (
+            select(Module)
+            .join(Module.device)
+            .where(
+                Device.linkage_group_id == trigger_module.device.linkage_group_id,
+                Module.id != trigger_module.id,
+            )
+        )
+        no_target_message = "no linkage targets found in the same device group"
+    else:
+        stmt = select(Module).where(
+            Module.device_id == trigger_module.device_id,
+            Module.id != trigger_module.id,
+        )
+        no_target_message = "no linkage targets found in the same device"
+
+    target_modules = list((await db.execute(stmt)).scalars().all())
+    return target_modules, no_target_message
+
+
+async def dispatch_linkage_for_alarm(
+    db: AsyncSession,
+    alarm: AlarmRecord,
+) -> AlarmLinkageDispatchResult:
+    trigger_module = await _get_trigger_module_with_device(db, alarm)
     if not trigger_module:
         alarm.linkage_status = "failed"
         alarm.linkage_result = "trigger module not found"
@@ -37,25 +70,7 @@ async def dispatch_linkage_for_alarm(
             linkage_result=alarm.linkage_result or "",
         )
 
-    # 联动优先按设备组找目标；如果设备还没挂组，则退回到原来的“同设备内其他模块”策略。
-    if trigger_module.device and trigger_module.device.linkage_group_id:
-        target_modules_stmt = (
-            select(Module)
-            .join(Module.device)
-            .where(
-                Device.linkage_group_id == trigger_module.device.linkage_group_id,
-                Module.id != trigger_module.id,
-            )
-        )
-        no_target_message = "no linkage targets found in the same device group"
-    else:
-        target_modules_stmt = select(Module).where(
-            Module.device_id == trigger_module.device_id,
-            Module.id != trigger_module.id,
-        )
-        no_target_message = "no linkage targets found in the same device"
-
-    target_modules = list((await db.execute(target_modules_stmt)).scalars().all())
+    target_modules, no_target_message = await _get_linkage_target_modules(db, trigger_module)
     if not target_modules:
         alarm.linkage_status = "no_targets"
         alarm.linkage_result = no_target_message
@@ -80,6 +95,7 @@ async def dispatch_linkage_for_alarm(
         existing_stmt = select(RelayCommand).where(
             RelayCommand.alarm_record_id == alarm.id,
             RelayCommand.module_id == target_module.id,
+            RelayCommand.command_source == "alarm_linkage",
         )
         existing_command = (await db.execute(existing_stmt)).scalar_one_or_none()
         if existing_command:
@@ -125,7 +141,6 @@ async def dispatch_linkage_for_alarm(
 
     alarm.linkage_status = linkage_status
     alarm.linkage_result = linkage_result
-
     await db.commit()
     await db.refresh(alarm)
 
@@ -138,6 +153,107 @@ async def dispatch_linkage_for_alarm(
         linkage_status=alarm.linkage_status,
         linkage_result=alarm.linkage_result or "",
     )
+
+
+async def dispatch_recovery_for_alarm(db: AsyncSession, alarm: AlarmRecord) -> dict[str, int | str]:
+    trigger_module = await _get_trigger_module_with_device(db, alarm)
+    if not trigger_module:
+        alarm.linkage_status = "recovery_failed"
+        alarm.linkage_result = "trigger module not found during recovery"
+        await db.commit()
+        await db.refresh(alarm)
+        return {
+            "generated_command_count": 0,
+            "dispatched_count": 0,
+            "queued_count": 0,
+            "skipped_count": 0,
+            "status": alarm.linkage_status,
+        }
+
+    target_modules, no_target_message = await _get_linkage_target_modules(db, trigger_module)
+    if not target_modules:
+        alarm.linkage_status = "recovery_no_targets"
+        alarm.linkage_result = no_target_message
+        await db.commit()
+        await db.refresh(alarm)
+        return {
+            "generated_command_count": 0,
+            "dispatched_count": 0,
+            "queued_count": 0,
+            "skipped_count": 0,
+            "status": alarm.linkage_status,
+        }
+
+    generated_command_count = 0
+    dispatched_count = 0
+    queued_count = 0
+    skipped_count = 0
+
+    for target_module in target_modules:
+        latest_manual_stmt = (
+            select(RelayCommand)
+            .where(
+                RelayCommand.module_id == target_module.id,
+                RelayCommand.command_source == "manual_control",
+                # SQLite 默认时间精度较粗，给报警触发时间留 1 秒容差，避免同秒内的人工操作被漏判。
+                RelayCommand.created_at >= alarm.triggered_at - timedelta(seconds=1),
+            )
+            .order_by(RelayCommand.created_at.desc(), RelayCommand.id.desc())
+            .limit(1)
+        )
+        latest_manual_command = (await db.execute(latest_manual_stmt)).scalar_one_or_none()
+
+        # 报警后如果用户手动控制过该模块，就跳过自动恢复，避免覆盖人工决策。
+        if latest_manual_command:
+            skipped_count += 1
+            continue
+
+        is_online = target_module.is_online
+        command = RelayCommand(
+            alarm_record_id=alarm.id,
+            module_id=target_module.id,
+            command_source="alarm_recovery",
+            target_state="open",
+            execution_status="dispatched" if is_online else "queued",
+            execution_result=(
+                "relay recovery command dispatched immediately"
+                if is_online
+                else "recovery command queued for offline module"
+            ),
+            retry_count=1 if is_online else 0,
+            last_attempt_at=datetime.now(timezone.utc) if is_online else None,
+        )
+        db.add(command)
+        generated_command_count += 1
+        if is_online:
+            dispatched_count += 1
+        else:
+            queued_count += 1
+
+    if generated_command_count == 0 and skipped_count > 0:
+        alarm.linkage_status = "recovery_skipped"
+        alarm.linkage_result = "recovery skipped because newer manual commands exist"
+    elif queued_count > 0 and dispatched_count > 0:
+        alarm.linkage_status = "recovery_partial"
+        alarm.linkage_result = (
+            f"{dispatched_count} recovery commands dispatched, {queued_count} queued"
+        )
+    elif queued_count > 0:
+        alarm.linkage_status = "recovery_queued"
+        alarm.linkage_result = f"{queued_count} recovery commands queued for offline modules"
+    else:
+        alarm.linkage_status = "recovery_dispatched"
+        alarm.linkage_result = f"{dispatched_count} recovery commands dispatched"
+
+    await db.commit()
+    await db.refresh(alarm)
+    return {
+        "generated_command_count": generated_command_count,
+        "dispatched_count": dispatched_count,
+        "queued_count": queued_count,
+        "skipped_count": skipped_count,
+        "status": alarm.linkage_status,
+    }
 
 
 async def retry_queued_relay_commands(db: AsyncSession) -> RelayRetryResult:
@@ -210,7 +326,22 @@ async def create_manual_relay_command(
     is_online = module.is_online
     now = datetime.now(timezone.utc)
 
-    # 人工控制也复用同一张指令表，便于后续统一查询和补发。
+    # 人工控制优先级高于自动联动。
+    # 这里会把同模块尚未执行的自动联动/自动恢复指令取消，避免后续补发把人工决策覆盖回去。
+    pending_auto_stmt = select(RelayCommand).where(
+        RelayCommand.module_id == payload.module_id,
+        RelayCommand.command_source.in_(["alarm_linkage", "alarm_recovery"]),
+        RelayCommand.execution_status.in_(["queued", "pending"]),
+    )
+    pending_auto_commands = list((await db.execute(pending_auto_stmt)).scalars().all())
+    for auto_command in pending_auto_commands:
+        auto_command.execution_status = "cancelled"
+        auto_command.execution_result = (
+            f"cancelled because newer manual command overrides {auto_command.command_source}"
+        )
+        auto_command.last_attempt_at = now
+
+    # 手动控制指令与报警联动指令分开记录，后续冲突处理会依赖 command_source 区分来源。
     command = RelayCommand(
         module_id=payload.module_id,
         command_source=payload.command_source,

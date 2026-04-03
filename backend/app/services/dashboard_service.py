@@ -1,6 +1,8 @@
+import csv
+import io
+
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.models.alarm_record import AlarmRecord
 from app.models.device import Device
@@ -9,14 +11,22 @@ from app.models.relay_command import RelayCommand
 from app.models.user import User
 from app.schemas.dashboard import (
     DashboardAlarmItem,
+    DashboardAlarmPage,
     DashboardCharts,
+    DashboardDeviceDetail,
     DashboardHome,
     DashboardRelayCommandItem,
+    DashboardRelayCommandPage,
     DashboardTrendPoint,
     MiniProgramAlarmItem,
+    MiniProgramAlarmPage,
     MiniProgramDeviceItem,
+    MiniProgramHome,
+    PaginationMeta,
 )
+from app.services.alarm_service import can_access_device
 from app.services.device_service import (
+    get_device_by_id,
     get_device_monitoring_list,
     get_device_overview,
     get_device_statistics,
@@ -41,7 +51,6 @@ async def get_dashboard_home(db: AsyncSession, user: User) -> DashboardHome:
         .where(RelayCommand.execution_status.in_(["queued", "pending"]))
     )
 
-    # 首页聚合接口要遵守账号可见范围，普通用户只能看到自己名下设备数据。
     if user.role != "super_admin":
         recent_alarm_stmt = recent_alarm_stmt.where(Device.owner_id == user.id)
         pending_command_stmt = pending_command_stmt.where(Device.owner_id == user.id)
@@ -62,18 +71,23 @@ async def list_dashboard_recent_alarms(
     db: AsyncSession,
     user: User,
     limit: int = 10,
+    offset: int = 0,
 ) -> list[DashboardAlarmItem]:
     stmt = (
         select(AlarmRecord, Module, Device)
         .join(Module, AlarmRecord.module_id == Module.id)
         .join(Device, Module.device_id == Device.id)
-        .order_by(AlarmRecord.triggered_at.desc(), AlarmRecord.id.desc())
-        .limit(limit)
     )
     if user.role != "super_admin":
         stmt = stmt.where(Device.owner_id == user.id)
 
-    rows = (await db.execute(stmt)).all()
+    rows = (
+        await db.execute(
+            stmt.order_by(AlarmRecord.triggered_at.desc(), AlarmRecord.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+    ).all()
     return [
         DashboardAlarmItem(
             id=alarm.id,
@@ -92,22 +106,48 @@ async def list_dashboard_recent_alarms(
     ]
 
 
+async def get_dashboard_alarm_page(
+    db: AsyncSession,
+    user: User,
+    limit: int = 10,
+    offset: int = 0,
+) -> DashboardAlarmPage:
+    items = await list_dashboard_recent_alarms(db, user, limit=limit, offset=offset)
+    count_stmt = (
+        select(func.count(AlarmRecord.id))
+        .join(Module, AlarmRecord.module_id == Module.id)
+        .join(Device, Module.device_id == Device.id)
+    )
+    if user.role != "super_admin":
+        count_stmt = count_stmt.where(Device.owner_id == user.id)
+    total = (await db.execute(count_stmt)).scalar_one() or 0
+    return DashboardAlarmPage(
+        items=items,
+        pagination=PaginationMeta(total=total, limit=limit, offset=offset),
+    )
+
+
 async def list_dashboard_recent_commands(
     db: AsyncSession,
     user: User,
     limit: int = 10,
+    offset: int = 0,
 ) -> list[DashboardRelayCommandItem]:
     stmt = (
         select(RelayCommand, Module, Device)
         .join(Module, RelayCommand.module_id == Module.id)
         .join(Device, Module.device_id == Device.id)
-        .order_by(RelayCommand.created_at.desc(), RelayCommand.id.desc())
-        .limit(limit)
     )
     if user.role != "super_admin":
         stmt = stmt.where(Device.owner_id == user.id)
 
-    rows = (await db.execute(stmt)).all()
+    rows = (
+        await db.execute(
+            stmt.order_by(RelayCommand.created_at.desc(), RelayCommand.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+    ).all()
     return [
         DashboardRelayCommandItem(
             id=command.id,
@@ -127,6 +167,27 @@ async def list_dashboard_recent_commands(
     ]
 
 
+async def get_dashboard_command_page(
+    db: AsyncSession,
+    user: User,
+    limit: int = 10,
+    offset: int = 0,
+) -> DashboardRelayCommandPage:
+    items = await list_dashboard_recent_commands(db, user, limit=limit, offset=offset)
+    count_stmt = (
+        select(func.count(RelayCommand.id))
+        .join(Module, RelayCommand.module_id == Module.id)
+        .join(Device, Module.device_id == Device.id)
+    )
+    if user.role != "super_admin":
+        count_stmt = count_stmt.where(Device.owner_id == user.id)
+    total = (await db.execute(count_stmt)).scalar_one() or 0
+    return DashboardRelayCommandPage(
+        items=items,
+        pagination=PaginationMeta(total=total, limit=limit, offset=offset),
+    )
+
+
 async def list_my_devices(db: AsyncSession, user: User) -> list[MiniProgramDeviceItem]:
     monitoring = await get_device_monitoring_list(db, user)
     return [
@@ -144,22 +205,54 @@ async def list_my_devices(db: AsyncSession, user: User) -> list[MiniProgramDevic
     ]
 
 
+async def get_miniprogram_home(db: AsyncSession, user: User) -> MiniProgramHome:
+    monitoring = await get_device_monitoring_list(db, user)
+    pending_command_stmt = (
+        select(func.count(RelayCommand.id))
+        .join(Module, RelayCommand.module_id == Module.id)
+        .join(Device, Module.device_id == Device.id)
+        .where(RelayCommand.execution_status.in_(["queued", "pending"]))
+    )
+    triggered_alarm_stmt = (
+        select(func.count(AlarmRecord.id))
+        .join(Module, AlarmRecord.module_id == Module.id)
+        .join(Device, Module.device_id == Device.id)
+        .where(AlarmRecord.alarm_status == "triggered")
+    )
+    if user.role != "super_admin":
+        pending_command_stmt = pending_command_stmt.where(Device.owner_id == user.id)
+        triggered_alarm_stmt = triggered_alarm_stmt.where(Device.owner_id == user.id)
+
+    # 小程序首页不需要全量统计，只保留最直接的 4 个摘要指标。
+    return MiniProgramHome(
+        device_count=len(monitoring),
+        online_device_count=sum(1 for item in monitoring if item.online_module_count > 0),
+        triggered_alarm_count=(await db.execute(triggered_alarm_stmt)).scalar_one() or 0,
+        pending_command_count=(await db.execute(pending_command_stmt)).scalar_one() or 0,
+    )
+
+
 async def list_my_recent_alarms(
     db: AsyncSession,
     user: User,
     limit: int = 10,
+    offset: int = 0,
 ) -> list[MiniProgramAlarmItem]:
     stmt = (
         select(AlarmRecord, Module, Device)
         .join(Module, AlarmRecord.module_id == Module.id)
         .join(Device, Module.device_id == Device.id)
-        .order_by(AlarmRecord.triggered_at.desc(), AlarmRecord.id.desc())
-        .limit(limit)
     )
     if user.role != "super_admin":
         stmt = stmt.where(Device.owner_id == user.id)
 
-    rows = (await db.execute(stmt)).all()
+    rows = (
+        await db.execute(
+            stmt.order_by(AlarmRecord.triggered_at.desc(), AlarmRecord.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+    ).all()
     return [
         MiniProgramAlarmItem(
             id=alarm.id,
@@ -173,6 +266,27 @@ async def list_my_recent_alarms(
         )
         for alarm, module, device in rows
     ]
+
+
+async def get_my_alarm_page(
+    db: AsyncSession,
+    user: User,
+    limit: int = 10,
+    offset: int = 0,
+) -> MiniProgramAlarmPage:
+    items = await list_my_recent_alarms(db, user, limit=limit, offset=offset)
+    count_stmt = (
+        select(func.count(AlarmRecord.id))
+        .join(Module, AlarmRecord.module_id == Module.id)
+        .join(Device, Module.device_id == Device.id)
+    )
+    if user.role != "super_admin":
+        count_stmt = count_stmt.where(Device.owner_id == user.id)
+    total = (await db.execute(count_stmt)).scalar_one() or 0
+    return MiniProgramAlarmPage(
+        items=items,
+        pagination=PaginationMeta(total=total, limit=limit, offset=offset),
+    )
 
 
 async def get_dashboard_charts(db: AsyncSession, user: User) -> DashboardCharts:
@@ -192,27 +306,9 @@ async def get_dashboard_charts(db: AsyncSession, user: User) -> DashboardCharts:
     )
     device_status_stmt = select(
         func.count(Device.id),
-        func.sum(
-            case(
-                (
-                    Device.status == "active",
-                    1,
-                ),
-                else_=0,
-            )
-        ),
-        func.sum(
-            case(
-                (
-                    Device.status == "inactive",
-                    1,
-                ),
-                else_=0,
-            )
-        ),
+        func.sum(case((Device.status == "active", 1), else_=0)),
+        func.sum(case((Device.status == "inactive", 1), else_=0)),
     )
-
-    # 图表接口也要按用户权限裁剪，保证 Web 和小程序直接复用时不越权。
     if user.role != "super_admin":
         alarm_stmt = alarm_stmt.where(Device.owner_id == user.id)
         command_stmt = command_stmt.where(Device.owner_id == user.id)
@@ -242,3 +338,156 @@ async def get_dashboard_charts(db: AsyncSession, user: User) -> DashboardCharts:
             DashboardTrendPoint(label="other", value=other_devices),
         ],
     )
+
+
+async def get_dashboard_device_detail(
+    db: AsyncSession,
+    user: User,
+    device_id: int,
+) -> DashboardDeviceDetail | None:
+    device = await get_device_by_id(db, device_id)
+    if not device or not can_access_device(user, device):
+        return None
+
+    monitoring_items = await get_device_monitoring_list(db, user)
+    monitoring_item = next((item for item in monitoring_items if item.device_id == device_id), None)
+
+    # 设备详情页直接返回最近报警和最近指令，前端不再额外拼多次请求。
+    recent_alarm_rows = (
+        await db.execute(
+            select(AlarmRecord, Module)
+            .join(Module, AlarmRecord.module_id == Module.id)
+            .where(Module.device_id == device_id)
+            .order_by(AlarmRecord.triggered_at.desc(), AlarmRecord.id.desc())
+            .limit(10)
+        )
+    ).all()
+    recent_command_rows = (
+        await db.execute(
+            select(RelayCommand, Module)
+            .join(Module, RelayCommand.module_id == Module.id)
+            .where(Module.device_id == device_id)
+            .order_by(RelayCommand.created_at.desc(), RelayCommand.id.desc())
+            .limit(10)
+        )
+    ).all()
+
+    return DashboardDeviceDetail(
+        device_id=device.id,
+        device_name=device.name,
+        serial_number=device.serial_number,
+        status=device.status,
+        owner_id=device.owner_id,
+        linkage_group_id=device.linkage_group_id,
+        module_count=monitoring_item.module_count if monitoring_item else len(device.modules),
+        online_module_count=monitoring_item.online_module_count if monitoring_item else sum(1 for item in device.modules if item.is_online),
+        offline_module_count=monitoring_item.offline_module_count if monitoring_item else sum(1 for item in device.modules if not item.is_online),
+        latest_alarm_type=monitoring_item.latest_alarm_type if monitoring_item else None,
+        latest_alarm_time=monitoring_item.latest_alarm_time if monitoring_item else None,
+        device_status=monitoring_item.device_status if monitoring_item else device.status,
+        recent_alarms=[
+            DashboardAlarmItem(
+                id=alarm.id,
+                module_id=alarm.module_id,
+                device_id=device.id,
+                device_name=device.name,
+                module_code=module.module_code,
+                alarm_type=alarm.alarm_type,
+                alarm_status=alarm.alarm_status,
+                source=alarm.source,
+                linkage_status=alarm.linkage_status,
+                message=alarm.message,
+                triggered_at=alarm.triggered_at,
+            )
+            for alarm, module in recent_alarm_rows
+        ],
+        recent_commands=[
+            DashboardRelayCommandItem(
+                id=command.id,
+                module_id=command.module_id,
+                device_id=device.id,
+                device_name=device.name,
+                module_code=module.module_code,
+                command_source=command.command_source,
+                target_state=command.target_state,
+                execution_status=command.execution_status,
+                feedback_status=command.feedback_status,
+                feedback_message=command.feedback_message,
+                created_at=command.created_at,
+                executed_at=command.executed_at,
+            )
+            for command, module in recent_command_rows
+        ],
+    )
+
+
+def build_alarm_export_csv(items: list[DashboardAlarmItem]) -> str:
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "alarm_id",
+            "device_id",
+            "device_name",
+            "module_code",
+            "alarm_type",
+            "alarm_status",
+            "source",
+            "linkage_status",
+            "message",
+            "triggered_at",
+        ]
+    )
+    for item in items:
+        writer.writerow(
+            [
+                item.id,
+                item.device_id,
+                item.device_name,
+                item.module_code,
+                item.alarm_type,
+                item.alarm_status,
+                item.source,
+                item.linkage_status,
+                item.message or "",
+                item.triggered_at.isoformat(),
+            ]
+        )
+    return output.getvalue()
+
+
+def build_command_export_csv(items: list[DashboardRelayCommandItem]) -> str:
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "command_id",
+            "device_id",
+            "device_name",
+            "module_code",
+            "command_source",
+            "target_state",
+            "execution_status",
+            "feedback_status",
+            "feedback_message",
+            "created_at",
+            "executed_at",
+        ]
+    )
+    for item in items:
+        writer.writerow(
+            [
+                item.id,
+                item.device_id,
+                item.device_name,
+                item.module_code,
+                item.command_source,
+                item.target_state,
+                item.execution_status,
+                item.feedback_status or "",
+                item.feedback_message or "",
+                item.created_at.isoformat(),
+                item.executed_at.isoformat() if item.executed_at else "",
+            ]
+        )
+    return output.getvalue()

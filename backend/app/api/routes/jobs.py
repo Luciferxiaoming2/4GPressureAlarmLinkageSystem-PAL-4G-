@@ -4,15 +4,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_admin
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.jobs import OfflineCheckResult, SchedulerStatus
-from app.schemas.maintenance import CleanupResult, DatabaseBackupResult, JobExecutionLogRead
+from app.schemas.jobs import AlarmRecoveryCheckResult, OfflineCheckResult, SchedulerJobRead, SchedulerStatus
+from app.schemas.maintenance import (
+    CleanupResult,
+    DatabaseBackupFileRead,
+    DatabaseBackupResult,
+    JobExecutionLogRead,
+)
 from app.schemas.relay import RelayRetryResult
 from app.services.maintenance_service import (
     backup_database,
+    list_database_backups,
     list_job_execution_logs,
 )
 from app.services.scheduler_service import (
     mark_offline_modules,
+    run_alarm_recovery_check_job,
     run_cleanup_runtime_files_job,
     run_retry_pending_commands_job,
     scheduler,
@@ -27,7 +34,14 @@ async def read_scheduler_status(
 ) -> SchedulerStatus:
     return SchedulerStatus(
         running=scheduler.running,
-        jobs=[job.id for job in scheduler.get_jobs()],
+        jobs=[
+            SchedulerJobRead(
+                id=job.id,
+                next_run_time=job.next_run_time,
+                trigger=str(job.trigger),
+            )
+            for job in scheduler.get_jobs()
+        ],
     )
 
 
@@ -79,6 +93,14 @@ async def run_retry_pending(
     return RelayRetryResult(**result)
 
 
+@router.post("/alarm-recovery-check", response_model=AlarmRecoveryCheckResult)
+async def run_alarm_recovery_check(
+    _: User = Depends(get_current_admin),
+) -> AlarmRecoveryCheckResult:
+    result = await run_alarm_recovery_check_job(trigger_type="manual")
+    return AlarmRecoveryCheckResult(**result)
+
+
 @router.post("/cleanup-files", response_model=CleanupResult)
 async def run_cleanup_files(
     _: User = Depends(get_current_admin),
@@ -93,3 +115,11 @@ async def run_backup_database(
 ) -> DatabaseBackupResult:
     # 数据库备份属于显式运维动作，只允许管理员手动触发。
     return await backup_database()
+
+
+@router.get("/backups", response_model=list[DatabaseBackupFileRead])
+async def read_database_backups(
+    limit: int = Query(default=20, ge=1, le=100),
+    _: User = Depends(get_current_admin),
+) -> list[DatabaseBackupFileRead]:
+    return await list_database_backups(limit=limit)

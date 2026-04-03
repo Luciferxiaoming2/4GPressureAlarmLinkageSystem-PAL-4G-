@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.communication_log import CommunicationLog
@@ -132,3 +132,125 @@ async def list_communication_logs(
     if status:
         stmt = stmt.where(CommunicationLog.status == status)
     return list((await db.execute(stmt)).scalars().all())
+
+
+async def _paginate_query(
+    db: AsyncSession,
+    stmt,
+    limit: int,
+    offset: int,
+) -> tuple[int, list]:
+    count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
+    total = int((await db.execute(count_stmt)).scalar_one())
+    items = list((await db.execute(stmt.offset(offset).limit(limit))).scalars().all())
+    return total, items
+
+
+async def list_runtime_logs_page(
+    db: AsyncSession,
+    level: str | None = None,
+    event: str | None = None,
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[int, list[RuntimeLog]]:
+    stmt = select(RuntimeLog).order_by(RuntimeLog.created_at.desc(), RuntimeLog.id.desc())
+    if level:
+        stmt = stmt.where(RuntimeLog.level == level)
+    if event:
+        stmt = stmt.where(RuntimeLog.event == event)
+    if created_from:
+        stmt = stmt.where(RuntimeLog.created_at >= created_from)
+    if created_to:
+        stmt = stmt.where(RuntimeLog.created_at <= created_to)
+    return await _paginate_query(db, stmt, limit, offset)
+
+
+async def list_operation_logs_page(
+    db: AsyncSession,
+    action: str | None = None,
+    target_type: str | None = None,
+    status: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[int, list[OperationLog]]:
+    stmt = select(OperationLog).order_by(
+        OperationLog.created_at.desc(), OperationLog.id.desc()
+    )
+    if action:
+        stmt = stmt.where(OperationLog.action == action)
+    if target_type:
+        stmt = stmt.where(OperationLog.target_type == target_type)
+    if status:
+        stmt = stmt.where(OperationLog.status == status)
+    return await _paginate_query(db, stmt, limit, offset)
+
+
+async def list_communication_logs_page(
+    db: AsyncSession,
+    channel: str | None = None,
+    direction: str | None = None,
+    device_serial: str | None = None,
+    status: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[int, list[CommunicationLog]]:
+    stmt = select(CommunicationLog).order_by(
+        CommunicationLog.created_at.desc(), CommunicationLog.id.desc()
+    )
+    if channel:
+        stmt = stmt.where(CommunicationLog.channel == channel)
+    if direction:
+        stmt = stmt.where(CommunicationLog.direction == direction)
+    if device_serial:
+        stmt = stmt.where(CommunicationLog.device_serial == device_serial)
+    if status:
+        stmt = stmt.where(CommunicationLog.status == status)
+    return await _paginate_query(db, stmt, limit, offset)
+
+
+async def get_logs_overview(db: AsyncSession) -> dict[str, int]:
+    # 日志总览用于后台运维快速判断错误量，不走明细查询链路。
+    runtime_total = int((await db.execute(select(func.count()).select_from(RuntimeLog))).scalar_one())
+    runtime_error_count = int(
+        (
+            await db.execute(
+                select(func.count())
+                .select_from(RuntimeLog)
+                .where(RuntimeLog.level.in_(["ERROR", "CRITICAL"]))
+            )
+        ).scalar_one()
+    )
+    operation_total = int(
+        (await db.execute(select(func.count()).select_from(OperationLog))).scalar_one()
+    )
+    operation_failed_count = int(
+        (
+            await db.execute(
+                select(func.count())
+                .select_from(OperationLog)
+                .where(OperationLog.status == "failed")
+            )
+        ).scalar_one()
+    )
+    communication_total = int(
+        (await db.execute(select(func.count()).select_from(CommunicationLog))).scalar_one()
+    )
+    communication_failed_count = int(
+        (
+            await db.execute(
+                select(func.count())
+                .select_from(CommunicationLog)
+                .where(CommunicationLog.status == "failed")
+            )
+        ).scalar_one()
+    )
+    return {
+        "runtime_total": runtime_total,
+        "runtime_error_count": runtime_error_count,
+        "operation_total": operation_total,
+        "operation_failed_count": operation_failed_count,
+        "communication_total": communication_total,
+        "communication_failed_count": communication_failed_count,
+    }
