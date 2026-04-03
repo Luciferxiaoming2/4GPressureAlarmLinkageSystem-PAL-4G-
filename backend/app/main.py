@@ -6,6 +6,7 @@ from app.api import api_router
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.db.session import init_db
+from app.services.scheduler_service import shutdown_scheduler, start_scheduler
 
 
 @asynccontextmanager
@@ -13,7 +14,9 @@ async def lifespan(_: FastAPI):
     configure_logging()
     # 服务启动时统一完成建表和默认管理员初始化，避免首次运行缺少基础数据。
     await init_db()
+    start_scheduler()
     yield
+    shutdown_scheduler()
 
 
 app = FastAPI(

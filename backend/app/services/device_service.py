@@ -19,6 +19,8 @@ from app.schemas.device import (
     ModuleStatusReport,
 )
 from app.services.alarm_service import create_alarm_record
+from app.services.linkage_service import dispatch_linkage_for_alarm
+from app.services.logging_service import write_communication_log
 
 
 async def list_devices(db: AsyncSession, user: User) -> list[Device]:
@@ -141,9 +143,20 @@ async def update_module_status(
     await db.commit()
     await db.refresh(module)
 
+    await write_communication_log(
+        db,
+        channel=payload.source if payload.source != "http_report" else "http",
+        direction="inbound",
+        status="success",
+        device_serial=module.device.serial_number if module.device else None,
+        module_code=module.module_code,
+        payload=payload.model_dump(),
+        message="module status updated",
+    )
+
     if payload.trigger_alarm_type:
         # 上报里带了报警类型时，顺手落一条报警记录，先形成最小业务闭环。
-        await create_alarm_record(
+        alarm = await create_alarm_record(
             db,
             AlarmRecordCreate(
                 module_id=module.id,
@@ -152,6 +165,7 @@ async def update_module_status(
                 message=payload.alarm_message,
             ),
         )
+        await dispatch_linkage_for_alarm(db, alarm)
 
     refreshed = await get_module_by_id(db, module.id)
     return refreshed or module

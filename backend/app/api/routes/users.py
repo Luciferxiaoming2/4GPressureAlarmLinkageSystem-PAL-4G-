@@ -5,6 +5,7 @@ from app.api.deps import get_current_admin
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.services.logging_service import write_operation_log
 from app.services.user_service import (
     create_user,
     get_user_by_id,
@@ -28,7 +29,7 @@ async def read_users(
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def create_new_user(
     payload: UserCreate,
-    _: User = Depends(get_current_admin),
+    current_admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ) -> UserRead:
     existing = await get_user_by_username(db, payload.username)
@@ -38,6 +39,14 @@ async def create_new_user(
             detail="Username already exists",
         )
     user = await create_user(db, payload)
+    await write_operation_log(
+        db,
+        action="create_user",
+        target_type="user",
+        actor_user_id=current_admin.id,
+        target_id=user.id,
+        detail=f"created user {user.username}",
+    )
     return UserRead.model_validate(user)
 
 
@@ -69,4 +78,12 @@ async def patch_user(
             detail="Current admin cannot deactivate self",
         )
     updated_user = await update_user(db, user, payload)
+    await write_operation_log(
+        db,
+        action="update_user",
+        target_type="user",
+        actor_user_id=current_admin.id,
+        target_id=updated_user.id,
+        detail=f"updated user {updated_user.username}",
+    )
     return UserRead.model_validate(updated_user)

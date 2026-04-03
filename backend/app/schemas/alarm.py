@@ -16,6 +16,16 @@ class AlarmRecordRecover(BaseModel):
     recovered_at: datetime | None = None
 
 
+class AlarmLinkageDispatchResult(BaseModel):
+    alarm_id: int
+    generated_command_count: int
+    dispatched_count: int
+    queued_count: int
+    skipped_count: int
+    linkage_status: str
+    linkage_result: str
+
+
 class AlarmRecordRead(BaseModel):
     id: int
     module_id: int

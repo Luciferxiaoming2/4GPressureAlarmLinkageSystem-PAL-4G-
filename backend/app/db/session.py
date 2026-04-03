@@ -2,7 +2,16 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import settings
 from app.db.base import Base
-from app.models import AlarmRecord, Device, Module, RelayCommand, User  # noqa: F401
+from app.models import (  # noqa: F401
+    AlarmRecord,
+    CommunicationLog,
+    Device,
+    Module,
+    OperationLog,
+    RelayCommand,
+    RuntimeLog,
+    User,
+)
 from app.services.user_service import ensure_default_admin
 
 

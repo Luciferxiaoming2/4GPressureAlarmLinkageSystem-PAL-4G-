@@ -15,6 +15,7 @@ from app.schemas.device import (
     ModuleDetail,
     ModuleStatusReport,
 )
+from app.services.logging_service import write_operation_log
 from app.services.device_service import (
     add_module_to_device,
     bind_device_by_serial,
@@ -70,6 +71,14 @@ async def bind_device(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     refreshed_device = await get_device_by_id(db, device.id)
+    await write_operation_log(
+        db,
+        action="bind_device",
+        target_type="device",
+        actor_user_id=current_user.id,
+        target_id=device.id,
+        detail=f"bound device {device.serial_number}",
+    )
     return DeviceRead.model_validate(refreshed_device)
 
 

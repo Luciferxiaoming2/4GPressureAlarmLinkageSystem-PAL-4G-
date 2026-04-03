@@ -15,6 +15,7 @@ from app.services.alarm_service import (
     list_alarm_records,
     recover_alarm_record,
 )
+from app.services.linkage_service import dispatch_linkage_for_alarm
 
 router = APIRouter()
 
@@ -60,6 +61,7 @@ async def create_new_alarm_record(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     alarm = await create_alarm_record(db, payload)
+    await dispatch_linkage_for_alarm(db, alarm)
     return AlarmRecordRead.model_validate(alarm)
 
 

@@ -23,6 +23,9 @@ class Settings(BaseSettings):
 
     LOG_LEVEL: str = "INFO"
     LOG_ROOT_DIR: str = "logs"
+    HEARTBEAT_TIMEOUT_SECONDS: int = 300
+    OFFLINE_CHECK_INTERVAL_SECONDS: int = 60
+    RETRY_PENDING_COMMANDS_INTERVAL_SECONDS: int = 60
 
     model_config = SettingsConfigDict(
         env_file=".env",
