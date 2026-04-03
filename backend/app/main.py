@@ -6,6 +6,7 @@ from app.api import api_router
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.db.session import init_db
+from app.services.mqtt_client_service import mqtt_client_service
 from app.services.scheduler_service import shutdown_scheduler, start_scheduler
 
 
@@ -15,7 +16,9 @@ async def lifespan(_: FastAPI):
     # 服务启动时统一完成建表和默认管理员初始化，避免首次运行缺少基础数据。
     await init_db()
     start_scheduler()
+    mqtt_client_service.start()
     yield
+    mqtt_client_service.stop()
     shutdown_scheduler()
 
 

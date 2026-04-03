@@ -8,7 +8,7 @@ from app.models.alarm_record import AlarmRecord
 from app.models.module import Module
 from app.models.relay_command import RelayCommand
 from app.schemas.alarm import AlarmLinkageDispatchResult
-from app.schemas.relay import RelayRetryResult
+from app.schemas.relay import RelayCommandCreate, RelayCommandFeedback, RelayRetryResult
 
 
 async def dispatch_linkage_for_alarm(
@@ -170,3 +170,61 @@ async def list_relay_commands(
     if execution_status:
         stmt = stmt.where(RelayCommand.execution_status == execution_status)
     return list((await db.execute(stmt)).scalars().all())
+
+
+async def get_relay_command_by_id(
+    db: AsyncSession,
+    command_id: int,
+) -> RelayCommand | None:
+    stmt = (
+        select(RelayCommand)
+        .options(selectinload(RelayCommand.module))
+        .where(RelayCommand.id == command_id)
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def create_manual_relay_command(
+    db: AsyncSession,
+    payload: RelayCommandCreate,
+) -> RelayCommand:
+    module = (await db.execute(select(Module).where(Module.id == payload.module_id))).scalar_one_or_none()
+    if not module:
+        raise ValueError("Module not found")
+
+    is_online = module.is_online
+    now = datetime.now(timezone.utc)
+
+    # 人工控制也复用同一张指令表，便于后续统一查询和补发。
+    command = RelayCommand(
+        module_id=payload.module_id,
+        command_source=payload.command_source,
+        target_state=payload.target_state,
+        execution_status="dispatched" if is_online else "queued",
+        execution_result=(
+            "manual relay command dispatched immediately"
+            if is_online
+            else "manual relay command queued for offline module"
+        ),
+        retry_count=1 if is_online else 0,
+        last_attempt_at=now if is_online else None,
+    )
+    db.add(command)
+    await db.commit()
+    await db.refresh(command)
+    return command
+
+
+async def apply_relay_command_feedback(
+    db: AsyncSession,
+    command: RelayCommand,
+    payload: RelayCommandFeedback,
+) -> RelayCommand:
+    command.execution_status = payload.execution_status
+    command.feedback_status = payload.feedback_status
+    command.feedback_message = payload.feedback_message
+    command.executed_at = datetime.now(timezone.utc)
+    command.execution_result = payload.feedback_message or command.execution_result
+    await db.commit()
+    await db.refresh(command)
+    return command

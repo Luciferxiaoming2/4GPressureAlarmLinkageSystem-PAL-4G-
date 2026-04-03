@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     MQTT_BROKER_PORT: int = 1883
     MQTT_USERNAME: str = ""
     MQTT_PASSWORD: str = ""
+    MQTT_CLIENT_ID: str = "pal_4g_backend"
+    MQTT_STATUS_TOPIC: str = "pal_4g/status/#"
+    MQTT_COMMAND_TOPIC_PREFIX: str = "pal_4g/commands"
+    MQTT_ENABLED: bool = False
 
     LOG_LEVEL: str = "INFO"
     LOG_ROOT_DIR: str = "logs"
