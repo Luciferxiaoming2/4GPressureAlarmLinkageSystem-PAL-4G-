@@ -35,3 +35,11 @@ class DeviceRead(BaseModel):
     modules: list[ModuleRead] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DeviceOverview(BaseModel):
+    total_devices: int
+    total_modules: int
+    online_modules: int
+    offline_modules: int
+    triggered_alarm_count: int

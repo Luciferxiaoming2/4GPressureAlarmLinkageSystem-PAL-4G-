@@ -4,11 +4,47 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.security import get_password_hash
 from app.models.user import User
+from app.schemas.user import UserCreate, UserUpdate
 
 
 async def get_user_by_username(db: AsyncSession, username: str) -> User | None:
     result = await db.execute(select(User).where(User.username == username))
     return result.scalar_one_or_none()
+
+
+async def get_user_by_id(db: AsyncSession, user_id: int) -> User | None:
+    result = await db.execute(select(User).where(User.id == user_id))
+    return result.scalar_one_or_none()
+
+
+async def list_users(db: AsyncSession) -> list[User]:
+    result = await db.execute(select(User).order_by(User.id.desc()))
+    return list(result.scalars().all())
+
+
+async def create_user(db: AsyncSession, payload: UserCreate) -> User:
+    user = User(
+        username=payload.username,
+        password_hash=get_password_hash(payload.password),
+        role=payload.role,
+        is_active=True,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+async def update_user(db: AsyncSession, user: User, payload: UserUpdate) -> User:
+    if payload.password:
+        user.password_hash = get_password_hash(payload.password)
+    if payload.role:
+        user.role = payload.role
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
+    await db.commit()
+    await db.refresh(user)
+    return user
 
 
 async def ensure_default_admin(db: AsyncSession) -> None:

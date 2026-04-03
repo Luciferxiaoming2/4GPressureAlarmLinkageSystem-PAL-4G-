@@ -4,17 +4,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.device import DeviceCreate, DeviceRead, ModuleCreate
+from app.schemas.device import DeviceCreate, DeviceOverview, DeviceRead, ModuleCreate
 from app.services.device_service import (
     add_module_to_device,
     create_device,
     get_device_by_id,
     get_device_by_serial_number,
+    get_device_overview,
     get_module_by_code,
     list_devices,
 )
 
 router = APIRouter()
+
+
+@router.get("/overview", response_model=DeviceOverview)
+async def read_device_overview(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DeviceOverview:
+    return await get_device_overview(db, current_user)
 
 
 @router.get("", response_model=list[DeviceRead])
