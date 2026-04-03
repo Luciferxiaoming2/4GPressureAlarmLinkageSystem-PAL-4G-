@@ -9,6 +9,7 @@ from app.db.session import init_db
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # 服务启动时统一完成建表和默认管理员初始化，避免首次运行缺少基础数据。
     await init_db()
     yield
 

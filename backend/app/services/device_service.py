@@ -21,6 +21,7 @@ from app.services.alarm_service import create_alarm_record
 
 async def list_devices(db: AsyncSession, user: User) -> list[Device]:
     stmt = select(Device).options(selectinload(Device.modules))
+    # 普通用户只能看到自己绑定的设备，管理员可查看全量。
     if user.role != "super_admin":
         stmt = stmt.where(Device.owner_id == user.id)
     stmt = stmt.order_by(Device.id.desc())
@@ -45,6 +46,7 @@ async def get_device_by_serial_number(db: AsyncSession, serial_number: str) -> D
 
 
 async def create_device(db: AsyncSession, payload: DeviceCreate, owner: User) -> Device:
+    # 管理员创建的设备先不强绑 owner，便于后续再分配或由普通用户主动绑定。
     device = Device(
         name=payload.name,
         serial_number=payload.serial_number,
@@ -93,6 +95,7 @@ async def bind_device_by_serial(
     payload: DeviceBind,
     current_user: User,
 ) -> Device:
+    # 绑定逻辑分两种：已存在但未归属的设备归到当前用户；不存在则按 SN 直接建档。
     existing_device = await get_device_by_serial_number(db, payload.serial_number)
     if existing_device:
         if existing_device.owner_id and existing_device.owner_id != current_user.id:
@@ -122,6 +125,7 @@ async def update_module_status(
     module: Module,
     payload: ModuleStatusReport,
 ) -> Module:
+    # 这里作为统一的“状态入口”，HTTP 上报和后续 MQTT 上报都可以复用这段逻辑。
     module.is_online = payload.is_online
     module.last_seen_at = datetime.now(timezone.utc)
 
@@ -136,6 +140,7 @@ async def update_module_status(
     await db.refresh(module)
 
     if payload.trigger_alarm_type:
+        # 上报里带了报警类型时，顺手落一条报警记录，先形成最小业务闭环。
         await create_alarm_record(
             db,
             AlarmRecordCreate(
@@ -150,6 +155,7 @@ async def update_module_status(
 
 
 async def get_device_overview(db: AsyncSession, user: User) -> DeviceOverview:
+    # 总览接口先聚合最核心的 5 个指标，后续可继续补运行率、报警频次等统计维度。
     device_stmt = select(func.count(Device.id))
     module_stmt = select(
         func.count(Module.id),

@@ -44,6 +44,7 @@ async def bind_device(
     current_user: User = Depends(get_current_user),
 ) -> DeviceRead:
     try:
+        # 绑定动作放到 service 层统一处理，避免路由层散落归属规则。
         device = await bind_device_by_serial(db, payload, current_user)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
@@ -88,6 +89,7 @@ async def report_module_status(
     if current_user.role != "super_admin" and module.device.owner_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
+    # 这里先提供 HTTP 版状态上报入口，后续接 MQTT 时复用同一套 service 逻辑。
     updated_module = await update_module_status(db, module, payload)
     return ModuleDetail.model_validate(updated_module)
 

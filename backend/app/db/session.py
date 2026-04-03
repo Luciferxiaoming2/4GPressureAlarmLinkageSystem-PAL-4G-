@@ -20,7 +20,9 @@ async def get_db():
 
 
 async def init_db() -> None:
+    # 先确保所有 ORM 模型对应的数据表存在。
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # 再补齐默认管理员，保证系统首次启动后可直接登录。
     async with AsyncSessionLocal() as session:
         await ensure_default_admin(session)

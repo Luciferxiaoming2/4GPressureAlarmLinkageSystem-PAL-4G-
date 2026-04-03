@@ -5,6 +5,7 @@ from passlib.context import CryptContext
 
 from app.core.config import settings
 
+# 这里使用 pbkdf2_sha256，避免 passlib + bcrypt 在当前 Windows 环境下的兼容性问题。
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
@@ -17,6 +18,7 @@ def get_password_hash(password: str) -> str:
 
 
 def create_access_token(subject: str, expires_delta: timedelta | None = None) -> str:
+    # token 里只保留最小必要身份信息，后续权限判断统一回库查询。
     expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )

@@ -23,6 +23,7 @@ async def list_users(db: AsyncSession) -> list[User]:
 
 
 async def create_user(db: AsyncSession, payload: UserCreate) -> User:
+    # 统一在服务层做密码哈希，避免路由层直接处理敏感字段。
     user = User(
         username=payload.username,
         password_hash=get_password_hash(payload.password),
@@ -36,6 +37,7 @@ async def create_user(db: AsyncSession, payload: UserCreate) -> User:
 
 
 async def update_user(db: AsyncSession, user: User, payload: UserUpdate) -> User:
+    # 仅更新显式传入的字段，避免 patch 请求把未传字段误覆盖。
     if payload.password:
         user.password_hash = get_password_hash(payload.password)
     if payload.role:
@@ -52,6 +54,7 @@ async def ensure_default_admin(db: AsyncSession) -> None:
     if existing_admin:
         return
 
+    # 默认管理员只在系统首次启动且不存在时创建一次。
     admin = User(
         username=settings.DEFAULT_ADMIN_USERNAME,
         password_hash=get_password_hash(settings.DEFAULT_ADMIN_PASSWORD),

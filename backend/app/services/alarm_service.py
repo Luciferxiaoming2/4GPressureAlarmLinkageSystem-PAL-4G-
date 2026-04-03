@@ -22,6 +22,7 @@ async def get_module_with_device(db: AsyncSession, module_id: int) -> Module | N
 
 
 def can_access_device(user: User, device: Device | None) -> bool:
+    # 超级管理员可访问全部设备，普通用户仅可访问自己名下设备。
     if user.role == "super_admin":
         return True
     return bool(device and device.owner_id == user.id)
@@ -31,6 +32,7 @@ async def create_alarm_record(
     db: AsyncSession,
     payload: AlarmRecordCreate,
 ) -> AlarmRecord:
+    # 当前先落一条独立报警记录，后续可在这里扩展联动结果、来源和去重策略。
     alarm = AlarmRecord(
         module_id=payload.module_id,
         alarm_type=payload.alarm_type,
@@ -80,6 +82,7 @@ async def recover_alarm_record(
     alarm: AlarmRecord,
     payload: AlarmRecordRecover,
 ) -> AlarmRecord:
+    # 恢复动作当前仅更新状态和恢复时间，后续可接入自动断开继电器等联动逻辑。
     alarm.alarm_status = "recovered"
     alarm.recovered_at = payload.recovered_at or datetime.now(timezone.utc)
     await db.commit()
