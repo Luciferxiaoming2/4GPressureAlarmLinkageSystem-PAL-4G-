@@ -12,7 +12,9 @@ from app.schemas.alarm import AlarmRecordCreate
 from app.schemas.device import (
     DeviceBind,
     DeviceCreate,
+    DeviceMonitoringItem,
     DeviceOverview,
+    DeviceStatistics,
     ModuleCreate,
     ModuleStatusReport,
 )
@@ -146,6 +148,7 @@ async def update_module_status(
             AlarmRecordCreate(
                 module_id=module.id,
                 alarm_type=payload.trigger_alarm_type,
+                source=payload.source,
                 message=payload.alarm_message,
             ),
         )
@@ -186,3 +189,101 @@ async def get_device_overview(db: AsyncSession, user: User) -> DeviceOverview:
         offline_modules=max(total_modules - online_modules, 0),
         triggered_alarm_count=triggered_alarm_count,
     )
+
+
+async def get_device_statistics(db: AsyncSession, user: User) -> DeviceStatistics:
+    # 统计接口在总览的基础上补齐报警类型维度，供后台首页和图表直接使用。
+    device_stmt = select(func.count(Device.id))
+    owned_device_stmt = select(func.count(Device.id)).where(Device.owner_id.is_not(None))
+    module_stmt = select(
+        func.count(Module.id),
+        func.sum(case((Module.is_online.is_(True), 1), else_=0)),
+    ).join(Device, Module.device_id == Device.id)
+    alarm_stmt = (
+        select(
+            func.count(AlarmRecord.id),
+            func.sum(case((AlarmRecord.alarm_type == "low_battery", 1), else_=0)),
+            func.sum(case((AlarmRecord.alarm_type.in_(["low_voltage", "high_voltage"]), 1), else_=0)),
+        )
+        .join(Module, AlarmRecord.module_id == Module.id)
+        .join(Device, Module.device_id == Device.id)
+        .where(AlarmRecord.alarm_status == "triggered")
+    )
+
+    if user.role != "super_admin":
+        device_stmt = device_stmt.where(Device.owner_id == user.id)
+        owned_device_stmt = owned_device_stmt.where(Device.owner_id == user.id)
+        module_stmt = module_stmt.where(Device.owner_id == user.id)
+        alarm_stmt = alarm_stmt.where(Device.owner_id == user.id)
+
+    total_devices = (await db.execute(device_stmt)).scalar_one() or 0
+    owned_devices = (await db.execute(owned_device_stmt)).scalar_one() or 0
+    module_result = (await db.execute(module_stmt)).one()
+    total_modules = module_result[0] or 0
+    online_modules = module_result[1] or 0
+    offline_modules = max(total_modules - online_modules, 0)
+    alarm_result = (await db.execute(alarm_stmt)).one()
+    triggered_alarm_count = alarm_result[0] or 0
+    low_battery_alarm_count = alarm_result[1] or 0
+    low_voltage_alarm_count = alarm_result[2] or 0
+
+    return DeviceStatistics(
+        total_devices=total_devices,
+        owned_devices=owned_devices,
+        total_modules=total_modules,
+        online_modules=online_modules,
+        offline_modules=offline_modules,
+        online_rate=(online_modules / total_modules) if total_modules else 0.0,
+        triggered_alarm_count=triggered_alarm_count,
+        low_battery_alarm_count=low_battery_alarm_count,
+        low_voltage_alarm_count=low_voltage_alarm_count,
+    )
+
+
+async def get_device_monitoring_list(
+    db: AsyncSession,
+    user: User,
+) -> list[DeviceMonitoringItem]:
+    devices = await list_devices(db, user)
+    monitoring_items: list[DeviceMonitoringItem] = []
+
+    for device in devices:
+        online_module_count = sum(1 for module in device.modules if module.is_online)
+        module_count = len(device.modules)
+        offline_module_count = max(module_count - online_module_count, 0)
+
+        latest_alarm_stmt = (
+            select(AlarmRecord)
+            .join(Module, AlarmRecord.module_id == Module.id)
+            .where(Module.device_id == device.id)
+            .order_by(AlarmRecord.triggered_at.desc(), AlarmRecord.id.desc())
+            .limit(1)
+        )
+        latest_alarm = (await db.execute(latest_alarm_stmt)).scalar_one_or_none()
+
+        # 设备状态先按模块在线情况简单归类，后续接入心跳阈值后再细化。
+        if module_count == 0:
+            device_status = "no_modules"
+        elif online_module_count == module_count:
+            device_status = "all_online"
+        elif online_module_count == 0:
+            device_status = "all_offline"
+        else:
+            device_status = "part_online"
+
+        monitoring_items.append(
+            DeviceMonitoringItem(
+                device_id=device.id,
+                device_name=device.name,
+                serial_number=device.serial_number,
+                owner_id=device.owner_id,
+                module_count=module_count,
+                online_module_count=online_module_count,
+                offline_module_count=offline_module_count,
+                latest_alarm_type=latest_alarm.alarm_type if latest_alarm else None,
+                latest_alarm_time=latest_alarm.triggered_at if latest_alarm else None,
+                device_status=device_status,
+            )
+        )
+
+    return monitoring_items

@@ -37,6 +37,9 @@ async def create_alarm_record(
         module_id=payload.module_id,
         alarm_type=payload.alarm_type,
         alarm_status="triggered",
+        source=payload.source,
+        linkage_status=payload.linkage_status,
+        linkage_result=payload.linkage_result,
         message=payload.message,
     )
     db.add(alarm)
@@ -56,6 +59,11 @@ async def list_alarm_records(
     alarm_type: str | None = None,
     alarm_status: str | None = None,
     module_id: int | None = None,
+    device_id: int | None = None,
+    source: str | None = None,
+    linkage_status: str | None = None,
+    triggered_from: datetime | None = None,
+    triggered_to: datetime | None = None,
 ) -> list[AlarmRecord]:
     stmt = (
         select(AlarmRecord)
@@ -71,6 +79,16 @@ async def list_alarm_records(
         stmt = stmt.where(AlarmRecord.alarm_status == alarm_status)
     if module_id:
         stmt = stmt.where(AlarmRecord.module_id == module_id)
+    if device_id:
+        stmt = stmt.where(Device.id == device_id)
+    if source:
+        stmt = stmt.where(AlarmRecord.source == source)
+    if linkage_status:
+        stmt = stmt.where(AlarmRecord.linkage_status == linkage_status)
+    if triggered_from:
+        stmt = stmt.where(AlarmRecord.triggered_at >= triggered_from)
+    if triggered_to:
+        stmt = stmt.where(AlarmRecord.triggered_at <= triggered_to)
 
     stmt = stmt.order_by(AlarmRecord.triggered_at.desc(), AlarmRecord.id.desc())
     result = await db.execute(stmt)

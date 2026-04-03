@@ -6,6 +6,9 @@ from pydantic import BaseModel, ConfigDict, Field
 class AlarmRecordCreate(BaseModel):
     module_id: int
     alarm_type: str = Field(min_length=1, max_length=32)
+    source: str = Field(default="manual", max_length=32)
+    linkage_status: str = Field(default="pending", max_length=32)
+    linkage_result: str | None = None
     message: str | None = None
 
 
@@ -18,6 +21,9 @@ class AlarmRecordRead(BaseModel):
     module_id: int
     alarm_type: str
     alarm_status: str
+    source: str
+    linkage_status: str
+    linkage_result: str | None
     message: str | None
     triggered_at: datetime
     recovered_at: datetime | None

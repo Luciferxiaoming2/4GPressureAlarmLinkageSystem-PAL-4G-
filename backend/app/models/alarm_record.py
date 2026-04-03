@@ -13,6 +13,9 @@ class AlarmRecord(Base):
     module_id: Mapped[int] = mapped_column(ForeignKey("modules.id"), index=True)
     alarm_type: Mapped[str] = mapped_column(String(32), index=True)
     alarm_status: Mapped[str] = mapped_column(String(32), default="triggered")
+    source: Mapped[str] = mapped_column(String(32), default="manual", index=True)
+    linkage_status: Mapped[str] = mapped_column(String(32), default="pending", index=True)
+    linkage_result: Mapped[str | None] = mapped_column(Text, nullable=True)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
     triggered_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True

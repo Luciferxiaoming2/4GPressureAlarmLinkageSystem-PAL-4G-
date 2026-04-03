@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +24,11 @@ async def read_alarm_records(
     alarm_type: str | None = Query(default=None),
     alarm_status: str | None = Query(default=None),
     module_id: int | None = Query(default=None),
+    device_id: int | None = Query(default=None),
+    source: str | None = Query(default=None),
+    linkage_status: str | None = Query(default=None),
+    triggered_from: datetime | None = Query(default=None),
+    triggered_to: datetime | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[AlarmRecordRead]:
@@ -31,6 +38,11 @@ async def read_alarm_records(
         alarm_type=alarm_type,
         alarm_status=alarm_status,
         module_id=module_id,
+        device_id=device_id,
+        source=source,
+        linkage_status=linkage_status,
+        triggered_from=triggered_from,
+        triggered_to=triggered_to,
     )
     return [AlarmRecordRead.model_validate(alarm) for alarm in alarms]
 

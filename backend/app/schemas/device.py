@@ -25,6 +25,7 @@ class ModuleDetail(ModuleRead):
 
 class ModuleStatusReport(BaseModel):
     is_online: bool
+    source: str = Field(default="http_report", max_length=32)
     relay_state: bool | None = None
     battery_level: int | None = Field(default=None, ge=0, le=100)
     voltage_value: float | None = None
@@ -61,3 +62,28 @@ class DeviceOverview(BaseModel):
     online_modules: int
     offline_modules: int
     triggered_alarm_count: int
+
+
+class DeviceStatistics(BaseModel):
+    total_devices: int
+    owned_devices: int
+    total_modules: int
+    online_modules: int
+    offline_modules: int
+    online_rate: float
+    triggered_alarm_count: int
+    low_battery_alarm_count: int
+    low_voltage_alarm_count: int
+
+
+class DeviceMonitoringItem(BaseModel):
+    device_id: int
+    device_name: str
+    serial_number: str
+    owner_id: int | None
+    module_count: int
+    online_module_count: int
+    offline_module_count: int
+    latest_alarm_type: str | None
+    latest_alarm_time: datetime | None
+    device_status: str

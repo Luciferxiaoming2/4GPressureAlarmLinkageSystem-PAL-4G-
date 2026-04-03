@@ -7,8 +7,10 @@ from app.models.user import User
 from app.schemas.device import (
     DeviceBind,
     DeviceCreate,
+    DeviceMonitoringItem,
     DeviceOverview,
     DeviceRead,
+    DeviceStatistics,
     ModuleCreate,
     ModuleDetail,
     ModuleStatusReport,
@@ -18,8 +20,10 @@ from app.services.device_service import (
     bind_device_by_serial,
     create_device,
     get_device_by_id,
+    get_device_monitoring_list,
     get_device_by_serial_number,
     get_device_overview,
+    get_device_statistics,
     get_module_by_id,
     get_module_by_code,
     list_devices,
@@ -35,6 +39,22 @@ async def read_device_overview(
     current_user: User = Depends(get_current_user),
 ) -> DeviceOverview:
     return await get_device_overview(db, current_user)
+
+
+@router.get("/statistics", response_model=DeviceStatistics)
+async def read_device_statistics(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DeviceStatistics:
+    return await get_device_statistics(db, current_user)
+
+
+@router.get("/monitoring", response_model=list[DeviceMonitoringItem])
+async def read_device_monitoring(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[DeviceMonitoringItem]:
+    return await get_device_monitoring_list(db, current_user)
 
 
 @router.post("/bind", response_model=DeviceRead, status_code=status.HTTP_201_CREATED)
