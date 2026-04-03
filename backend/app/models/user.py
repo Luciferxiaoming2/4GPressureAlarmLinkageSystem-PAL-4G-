@@ -12,7 +12,8 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(String(32), default="device_user")
+    # 当前业务默认角色是管理人员，device_user 先保留给后续终端用户场景扩展。
+    role: Mapped[str] = mapped_column(String(32), default="manager")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
