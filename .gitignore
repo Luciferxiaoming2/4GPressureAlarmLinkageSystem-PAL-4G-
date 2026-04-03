@@ -38,6 +38,9 @@ htmlcov/
 .venv/
 venv/
 env/
+backend/tests/
+backend/*.db
+backend/pytest-cache-files-*/
 
 # Build artifacts
 build/
