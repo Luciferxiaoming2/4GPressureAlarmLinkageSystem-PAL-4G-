@@ -1,6 +1,6 @@
 import csv
 import io
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +33,14 @@ from app.services.device_service import (
     get_device_overview,
     get_device_statistics,
 )
+
+
+def _normalize_utc_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
 
 
 async def list_dashboard_module_panels(
@@ -77,11 +85,11 @@ async def list_dashboard_module_panels(
             battery_level=module.battery_level,
             voltage_value=module.voltage_value,
             relay_state=module.relay_state,
-            last_seen_at=module.last_seen_at,
+            last_seen_at=_normalize_utc_datetime(module.last_seen_at),
             latest_alarm_type=latest_alarm_map.get(module.id).alarm_type
             if latest_alarm_map.get(module.id)
             else None,
-            latest_alarm_time=latest_alarm_map.get(module.id).triggered_at
+            latest_alarm_time=_normalize_utc_datetime(latest_alarm_map.get(module.id).triggered_at)
             if latest_alarm_map.get(module.id)
             else None,
         )
@@ -182,7 +190,7 @@ async def list_dashboard_recent_alarms(
             source=alarm.source,
             linkage_status=alarm.linkage_status,
             message=alarm.message,
-            triggered_at=alarm.triggered_at,
+            triggered_at=_normalize_utc_datetime(alarm.triggered_at),
         )
         for alarm, module, device in rows
     ]
@@ -276,8 +284,8 @@ async def list_dashboard_recent_commands(
             execution_status=command.execution_status,
             feedback_status=command.feedback_status,
             feedback_message=command.feedback_message,
-            created_at=command.created_at,
-            executed_at=command.executed_at,
+            created_at=_normalize_utc_datetime(command.created_at),
+            executed_at=_normalize_utc_datetime(command.executed_at),
         )
         for command, module, device in rows
     ]
@@ -314,7 +322,7 @@ async def list_my_devices(db: AsyncSession, user: User) -> list[MiniProgramDevic
             module_count=item.module_count,
             online_module_count=item.online_module_count,
             latest_alarm_type=item.latest_alarm_type,
-            latest_alarm_time=item.latest_alarm_time,
+            latest_alarm_time=_normalize_utc_datetime(item.latest_alarm_time),
             device_status=item.device_status,
         )
         for item in monitoring
@@ -377,7 +385,7 @@ async def list_my_recent_alarms(
             module_code=module.module_code,
             alarm_type=alarm.alarm_type,
             alarm_status=alarm.alarm_status,
-            triggered_at=alarm.triggered_at,
+            triggered_at=_normalize_utc_datetime(alarm.triggered_at),
             message=alarm.message,
         )
         for alarm, module, device in rows
@@ -499,7 +507,7 @@ async def get_dashboard_device_detail(
         online_module_count=monitoring_item.online_module_count if monitoring_item else sum(1 for item in device.modules if item.is_online),
         offline_module_count=monitoring_item.offline_module_count if monitoring_item else sum(1 for item in device.modules if not item.is_online),
         latest_alarm_type=monitoring_item.latest_alarm_type if monitoring_item else None,
-        latest_alarm_time=monitoring_item.latest_alarm_time if monitoring_item else None,
+        latest_alarm_time=_normalize_utc_datetime(monitoring_item.latest_alarm_time) if monitoring_item else None,
         device_status=monitoring_item.device_status if monitoring_item else device.status,
         recent_alarms=[
             DashboardAlarmItem(
@@ -513,7 +521,7 @@ async def get_dashboard_device_detail(
                 source=alarm.source,
                 linkage_status=alarm.linkage_status,
                 message=alarm.message,
-                triggered_at=alarm.triggered_at,
+                triggered_at=_normalize_utc_datetime(alarm.triggered_at),
             )
             for alarm, module in recent_alarm_rows
         ],
@@ -529,8 +537,8 @@ async def get_dashboard_device_detail(
                 execution_status=command.execution_status,
                 feedback_status=command.feedback_status,
                 feedback_message=command.feedback_message,
-                created_at=command.created_at,
-                executed_at=command.executed_at,
+                created_at=_normalize_utc_datetime(command.created_at),
+                executed_at=_normalize_utc_datetime(command.executed_at),
             )
             for command, module in recent_command_rows
         ],

@@ -29,6 +29,7 @@ from app.schemas.device import (
 from app.services.alarm_service import create_alarm_record
 from app.services.linkage_service import dispatch_linkage_for_alarm
 from app.services.logging_service import write_communication_log
+from app.services.realtime_service import realtime_service
 
 
 async def list_devices(db: AsyncSession, user: User) -> list[Device]:
@@ -355,6 +356,22 @@ async def update_module_status(
         message="module status updated",
     )
 
+    await realtime_service.broadcast(
+        "module.status_updated",
+        {
+            "module_id": module.id,
+            "device_id": module.device_id,
+            "serial_number": module.device.serial_number if module.device else None,
+            "module_code": module.module_code,
+            "is_online": module.is_online,
+            "relay_state": module.relay_state,
+            "battery_level": module.battery_level,
+            "voltage_value": module.voltage_value,
+            "last_seen_at": module.last_seen_at.isoformat() if module.last_seen_at else None,
+        },
+        owner_id=module.device.owner_id if module.device else None,
+    )
+
     if payload.trigger_alarm_type:
         # 上报里带了报警类型时，顺手落一条报警记录，先形成最小业务闭环。
         alarm = await create_alarm_record(
@@ -367,6 +384,20 @@ async def update_module_status(
             ),
         )
         await dispatch_linkage_for_alarm(db, alarm)
+        await realtime_service.broadcast(
+            "alarm.created",
+            {
+                "alarm_id": alarm.id,
+                "module_id": alarm.module_id,
+                "device_id": module.device_id,
+                "alarm_type": alarm.alarm_type,
+                "alarm_status": alarm.alarm_status,
+                "source": alarm.source,
+                "linkage_status": alarm.linkage_status,
+                "triggered_at": alarm.triggered_at.isoformat(),
+            },
+            owner_id=module.device.owner_id if module.device else None,
+        )
 
     refreshed = await get_module_by_id(db, module.id)
     return refreshed or module

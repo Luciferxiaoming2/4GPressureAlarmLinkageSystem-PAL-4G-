@@ -16,6 +16,7 @@ from app.services.alarm_service import (
     recover_alarm_record,
 )
 from app.services.linkage_service import dispatch_linkage_for_alarm, dispatch_recovery_for_alarm
+from app.services.realtime_service import realtime_service
 
 router = APIRouter()
 
@@ -62,6 +63,20 @@ async def create_new_alarm_record(
 
     alarm = await create_alarm_record(db, payload)
     await dispatch_linkage_for_alarm(db, alarm)
+    await realtime_service.broadcast(
+        "alarm.created",
+        {
+            "alarm_id": alarm.id,
+            "module_id": alarm.module_id,
+            "device_id": module.device.id if module.device else None,
+            "alarm_type": alarm.alarm_type,
+            "alarm_status": alarm.alarm_status,
+            "source": alarm.source,
+            "linkage_status": alarm.linkage_status,
+            "triggered_at": alarm.triggered_at.isoformat(),
+        },
+        owner_id=module.device.owner_id if module and module.device else None,
+    )
     return AlarmRecordRead.model_validate(alarm)
 
 
@@ -100,4 +115,17 @@ async def recover_alarm(
     alarm = await recover_alarm_record(db, alarm, payload)
     # 报警恢复后自动尝试下发恢复指令；若用户在报警期间做过手动操作，则恢复逻辑会自动跳过。
     await dispatch_recovery_for_alarm(db, alarm)
+    await realtime_service.broadcast(
+        "alarm.recovered",
+        {
+            "alarm_id": alarm.id,
+            "module_id": alarm.module_id,
+            "device_id": module.device.id if module.device else None,
+            "alarm_type": alarm.alarm_type,
+            "alarm_status": alarm.alarm_status,
+            "linkage_status": alarm.linkage_status,
+            "recovered_at": alarm.recovered_at.isoformat() if alarm.recovered_at else None,
+        },
+        owner_id=module.device.owner_id if module and module.device else None,
+    )
     return AlarmRecordRead.model_validate(alarm)

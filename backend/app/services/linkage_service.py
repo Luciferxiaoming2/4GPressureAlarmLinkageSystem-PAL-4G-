@@ -10,6 +10,7 @@ from app.models.module import Module
 from app.models.relay_command import RelayCommand
 from app.schemas.alarm import AlarmLinkageDispatchResult
 from app.schemas.relay import RelayCommandCreate, RelayCommandFeedback, RelayRetryResult
+from app.services.realtime_service import realtime_service
 
 
 async def _get_trigger_module_with_device(
@@ -144,6 +145,30 @@ async def dispatch_linkage_for_alarm(
     await db.commit()
     await db.refresh(alarm)
 
+    relay_commands = list(
+        (
+            await db.execute(
+                select(RelayCommand).where(
+                    RelayCommand.alarm_record_id == alarm.id,
+                    RelayCommand.command_source == "alarm_linkage",
+                )
+            )
+        ).scalars().all()
+    )
+    for command in relay_commands:
+        await realtime_service.broadcast(
+            "relay_command.created",
+            {
+                "command_id": command.id,
+                "alarm_record_id": command.alarm_record_id,
+                "module_id": command.module_id,
+                "command_source": command.command_source,
+                "target_state": command.target_state,
+                "execution_status": command.execution_status,
+            },
+            owner_id=trigger_module.device.owner_id if trigger_module.device else None,
+        )
+
     return AlarmLinkageDispatchResult(
         alarm_id=alarm.id,
         generated_command_count=generated_command_count,
@@ -247,6 +272,29 @@ async def dispatch_recovery_for_alarm(db: AsyncSession, alarm: AlarmRecord) -> d
 
     await db.commit()
     await db.refresh(alarm)
+    relay_commands = list(
+        (
+            await db.execute(
+                select(RelayCommand).where(
+                    RelayCommand.alarm_record_id == alarm.id,
+                    RelayCommand.command_source == "alarm_recovery",
+                )
+            )
+        ).scalars().all()
+    )
+    for command in relay_commands:
+        await realtime_service.broadcast(
+            "relay_command.created",
+            {
+                "command_id": command.id,
+                "alarm_record_id": command.alarm_record_id,
+                "module_id": command.module_id,
+                "command_source": command.command_source,
+                "target_state": command.target_state,
+                "execution_status": command.execution_status,
+            },
+            owner_id=trigger_module.device.owner_id if trigger_module.device else None,
+        )
     return {
         "generated_command_count": generated_command_count,
         "dispatched_count": dispatched_count,
@@ -259,7 +307,7 @@ async def dispatch_recovery_for_alarm(db: AsyncSession, alarm: AlarmRecord) -> d
 async def retry_queued_relay_commands(db: AsyncSession) -> RelayRetryResult:
     queued_stmt = (
         select(RelayCommand)
-        .options(selectinload(RelayCommand.module))
+        .options(selectinload(RelayCommand.module).selectinload(Module.device))
         .where(RelayCommand.execution_status.in_(["queued", "pending"]))
         .order_by(RelayCommand.created_at.asc(), RelayCommand.id.asc())
     )
@@ -282,6 +330,23 @@ async def retry_queued_relay_commands(db: AsyncSession) -> RelayRetryResult:
             still_queued_count += 1
 
     await db.commit()
+
+    for command in queued_commands:
+        await realtime_service.broadcast(
+            "relay_command.updated",
+            {
+                "command_id": command.id,
+                "alarm_record_id": command.alarm_record_id,
+                "module_id": command.module_id,
+                "command_source": command.command_source,
+                "target_state": command.target_state,
+                "execution_status": command.execution_status,
+                "execution_result": command.execution_result,
+            },
+            owner_id=command.module.device.owner_id
+            if command.module and command.module.device
+            else None,
+        )
 
     return RelayRetryResult(
         total_scanned=len(queued_commands),
@@ -309,7 +374,7 @@ async def get_relay_command_by_id(
 ) -> RelayCommand | None:
     stmt = (
         select(RelayCommand)
-        .options(selectinload(RelayCommand.module))
+        .options(selectinload(RelayCommand.module).selectinload(Module.device))
         .where(RelayCommand.id == command_id)
     )
     return (await db.execute(stmt)).scalar_one_or_none()
@@ -319,7 +384,13 @@ async def create_manual_relay_command(
     db: AsyncSession,
     payload: RelayCommandCreate,
 ) -> RelayCommand:
-    module = (await db.execute(select(Module).where(Module.id == payload.module_id))).scalar_one_or_none()
+    module = (
+        await db.execute(
+            select(Module)
+            .options(selectinload(Module.device))
+            .where(Module.id == payload.module_id)
+        )
+    ).scalar_one_or_none()
     if not module:
         raise ValueError("Module not found")
 
@@ -358,6 +429,18 @@ async def create_manual_relay_command(
     db.add(command)
     await db.commit()
     await db.refresh(command)
+    await realtime_service.broadcast(
+        "relay_command.created",
+        {
+            "command_id": command.id,
+            "alarm_record_id": command.alarm_record_id,
+            "module_id": command.module_id,
+            "command_source": command.command_source,
+            "target_state": command.target_state,
+            "execution_status": command.execution_status,
+        },
+        owner_id=module.device.owner_id if module.device else None,
+    )
     return command
 
 
@@ -373,4 +456,21 @@ async def apply_relay_command_feedback(
     command.execution_result = payload.feedback_message or command.execution_result
     await db.commit()
     await db.refresh(command)
+    await realtime_service.broadcast(
+        "relay_command.updated",
+        {
+            "command_id": command.id,
+            "alarm_record_id": command.alarm_record_id,
+            "module_id": command.module_id,
+            "command_source": command.command_source,
+            "target_state": command.target_state,
+            "execution_status": command.execution_status,
+            "feedback_status": command.feedback_status,
+            "feedback_message": command.feedback_message,
+            "executed_at": command.executed_at.isoformat() if command.executed_at else None,
+        },
+        owner_id=command.module.device.owner_id
+        if command.module and command.module.device
+        else None,
+    )
     return command
