@@ -41,6 +41,30 @@ export interface DeviceBindPayload {
   name?: string | null
 }
 
+export interface DeviceCreatePayload {
+  name: string
+  serial_number: string
+}
+
+export interface DeviceUpdatePayload {
+  name?: string
+  status?: string
+}
+
+export interface DeviceDeleteResult {
+  device_id: number
+  deleted: boolean
+}
+
+export interface ModuleCreatePayload {
+  module_code: string
+}
+
+export interface ModuleDeleteResult {
+  module_id: number
+  deleted: boolean
+}
+
 export interface DeviceOverview {
   total_devices: number
   total_modules: number

@@ -19,6 +19,14 @@
       </div>
     </PanelCard>
 
+    <el-alert
+      :title="t('users.deleteUnavailable')"
+      type="info"
+      :closable="false"
+      show-icon
+      style="margin-bottom: 20px"
+    />
+
     <PanelCard :title="t('users.title')" :description="t('users.description')">
       <DataState :loading="loading" :error="error" :empty="!filteredUsers.length" @retry="fetchUsers">
         <div class="data-table">

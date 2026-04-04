@@ -61,7 +61,11 @@
           <el-table :data="filteredItems">
             <el-table-column prop="device_name" :label="t('alarms.table.deviceName')" min-width="180" />
             <el-table-column prop="module_code" :label="t('alarms.table.moduleCode')" min-width="100" />
-            <el-table-column prop="alarm_type" :label="t('alarms.table.alarmType')" min-width="120" />
+            <el-table-column :label="t('alarms.table.alarmType')" min-width="120">
+              <template #default="{ row }">
+                {{ resolveAlarmTypeLabel(row.alarm_type, t) }}
+              </template>
+            </el-table-column>
             <el-table-column :label="t('alarms.table.alarmStatus')" min-width="110">
               <template #default="{ row }">
                 <StatusPill :value="row.alarm_status" :mapping="alarmStatusMeta" />
@@ -107,6 +111,7 @@ import StatusPill from '@/components/StatusPill.vue'
 import { useI18n } from '@/composables/useI18n'
 import type { DashboardAlarmItem } from '@/types/domain'
 import { formatDateTime } from '@/utils/format'
+import { resolveAlarmTypeLabel } from '@/utils/labels'
 import { alarmStatusMeta, linkageStatusMeta } from '@/utils/status'
 
 const { t } = useI18n()

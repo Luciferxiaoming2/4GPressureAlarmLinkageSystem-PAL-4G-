@@ -6,7 +6,10 @@
         <p>{{ t('devices.description') }}</p>
       </div>
       <div class="toolbar__actions">
-        <el-button v-if="!isAdmin" type="primary" @click="bindDialogVisible = true">
+        <el-button v-if="canManageDevices" type="primary" @click="openCreateDialog">
+          {{ t('devices.createDevice') }}
+        </el-button>
+        <el-button v-if="!isAdmin" @click="bindDialogVisible = true">
           {{ t('devices.bindDevice') }}
         </el-button>
         <el-button type="primary" plain @click="fetchDevices">{{ t('common.refresh') }}</el-button>
@@ -14,8 +17,8 @@
     </div>
 
     <PanelCard>
-        <div class="toolbar">
-          <div class="toolbar__filters">
+      <div class="toolbar">
+        <div class="toolbar__filters">
           <el-input v-model="keyword" clearable :placeholder="t('devices.searchPlaceholder')" style="width: 260px" />
         </div>
       </div>
@@ -58,15 +61,21 @@
               <template #default="{ row }">{{ resolveGroupName(row.linkage_group_id) }}</template>
             </el-table-column>
             <el-table-column :label="t('devices.table.latestAlarm')" min-width="140">
-              <template #default="{ row }">{{ row.latest_alarm_type || '--' }}</template>
+              <template #default="{ row }">{{ resolveAlarmTypeLabel(row.latest_alarm_type, t) }}</template>
             </el-table-column>
             <el-table-column :label="t('devices.table.latestAlarmTime')" min-width="180">
               <template #default="{ row }">{{ formatDateTime(row.latest_alarm_time) }}</template>
             </el-table-column>
-            <el-table-column :label="t('common.actions')" min-width="240" fixed="right">
+            <el-table-column :label="t('common.actions')" min-width="320" fixed="right">
               <template #default="{ row }">
                 <el-button type="primary" link @click="router.push(`/devices/${row.device_id}`)">
                   {{ t('common.details') }}
+                </el-button>
+                <el-button v-if="canManageDevices" link @click="openEditDialog(row)">
+                  {{ t('common.edit') }}
+                </el-button>
+                <el-button v-if="isAdmin" link type="danger" @click="handleDeleteDevice(row)">
+                  {{ t('common.delete') }}
                 </el-button>
                 <el-button v-if="isAdmin" link type="warning" @click="openOwnerDialog(row)">
                   {{ t('devices.assignOwner') }}
@@ -83,6 +92,33 @@
         </div>
       </DataState>
     </PanelCard>
+
+    <el-dialog v-model="deviceDialogVisible" :title="deviceDialogTitle" width="460px">
+      <el-form ref="deviceFormRef" :model="deviceForm" :rules="deviceRules" label-position="top">
+        <el-form-item :label="t('devices.nameLabel')" prop="name">
+          <el-input v-model="deviceForm.name" :placeholder="t('devices.namePlaceholder')" />
+        </el-form-item>
+        <el-form-item :label="t('devices.serialLabel')" prop="serial_number">
+          <el-input
+            v-model="deviceForm.serial_number"
+            :placeholder="t('devices.serialPlaceholder')"
+            :disabled="deviceDialogMode === 'edit'"
+          />
+        </el-form-item>
+        <el-form-item v-if="deviceDialogMode === 'edit'" :label="t('devices.statusLabel')" prop="status">
+          <el-select v-model="deviceForm.status" style="width: 100%">
+            <el-option :label="t('status.device.active')" value="active" />
+            <el-option :label="t('status.device.inactive')" value="inactive" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="deviceDialogVisible = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="submitting" @click="submitDevice">
+          {{ t('common.save') }}
+        </el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="bindDialogVisible" :title="t('devices.bindDialogTitle')" width="460px">
       <el-form label-position="top">
@@ -137,7 +173,8 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -145,10 +182,13 @@ import {
   assignDeviceGroupApi,
   assignDeviceOwnerApi,
   bindDeviceApi,
+  createDeviceApi,
+  deleteDeviceApi,
   getDeviceGroupsApi,
   getDeviceMonitoringApi,
   getDevicesApi,
   unbindDeviceApi,
+  updateDeviceApi,
 } from '@/api/devices'
 import { getUsersApi } from '@/api/users'
 import DataState from '@/components/DataState.vue'
@@ -158,11 +198,13 @@ import { useI18n } from '@/composables/useI18n'
 import { useAuthStore } from '@/stores/auth'
 import type { DeviceGroupRead, DeviceMonitoringItem, DeviceRead, UserRead } from '@/types/domain'
 import { formatDateTime } from '@/utils/format'
+import { resolveAlarmTypeLabel } from '@/utils/labels'
 import { deviceStatusMeta } from '@/utils/status'
 
 type DeviceRow = DeviceMonitoringItem & {
   owner_id: number | null
   linkage_group_id: number | null
+  status: string
 }
 
 const { t } = useI18n()
@@ -178,11 +220,20 @@ const currentDeviceId = ref<number | null>(null)
 const ownerDialogVisible = ref(false)
 const groupDialogVisible = ref(false)
 const bindDialogVisible = ref(false)
+const deviceDialogVisible = ref(false)
+const deviceDialogMode = ref<'create' | 'edit'>('create')
+const deviceFormRef = ref<FormInstance>()
 const submitting = ref(false)
 
 const bindForm = reactive({
   serial_number: '',
   name: '',
+})
+
+const deviceForm = reactive({
+  name: '',
+  serial_number: '',
+  status: 'inactive',
 })
 
 const ownerForm = reactive({
@@ -194,6 +245,28 @@ const groupForm = reactive({
 })
 
 const isAdmin = computed(() => authStore.profile?.role === 'super_admin')
+const canManageDevices = computed(
+  () => Boolean(authStore.profile) && authStore.profile?.role !== 'device_user',
+)
+const deviceDialogTitle = computed(() =>
+  t(deviceDialogMode.value === 'create' ? 'devices.createDialogTitle' : 'devices.editDialogTitle'),
+)
+
+const deviceRules: FormRules<typeof deviceForm> = {
+  name: [{ required: true, message: t('devices.validations.nameRequired'), trigger: 'blur' }],
+  serial_number: [
+    {
+      validator: (_rule, value, callback) => {
+        if (deviceDialogMode.value === 'create' && !String(value || '').trim()) {
+          callback(new Error(t('devices.validations.serialRequired')))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur',
+    },
+  ],
+}
 
 const filteredDevices = computed(() => {
   const search = keyword.value.trim().toLowerCase()
@@ -204,6 +277,28 @@ const filteredDevices = computed(() => {
       item.serial_number.toLowerCase().includes(search),
   )
 })
+
+function resetDeviceForm() {
+  deviceForm.name = ''
+  deviceForm.serial_number = ''
+  deviceForm.status = 'inactive'
+}
+
+function openCreateDialog() {
+  currentDeviceId.value = null
+  deviceDialogMode.value = 'create'
+  resetDeviceForm()
+  deviceDialogVisible.value = true
+}
+
+function openEditDialog(row: DeviceRow) {
+  currentDeviceId.value = row.device_id
+  deviceDialogMode.value = 'edit'
+  deviceForm.name = row.device_name
+  deviceForm.serial_number = row.serial_number
+  deviceForm.status = row.status || 'inactive'
+  deviceDialogVisible.value = true
+}
 
 function resolveOwnerName(ownerId: number | null) {
   if (!ownerId) return '--'
@@ -219,7 +314,7 @@ async function fetchDevices() {
   loading.value = true
   error.value = ''
   try {
-    const requests: Promise<any>[] = [getDeviceMonitoringApi(), getDevicesApi()]
+    const requests: Promise<unknown>[] = [getDeviceMonitoringApi(), getDevicesApi()]
     if (isAdmin.value) {
       requests.push(getUsersApi(), getDeviceGroupsApi())
     }
@@ -229,6 +324,7 @@ async function fetchDevices() {
       ...item,
       owner_id: deviceMap.get(item.device_id)?.owner_id ?? null,
       linkage_group_id: deviceMap.get(item.device_id)?.linkage_group_id ?? null,
+      status: deviceMap.get(item.device_id)?.status ?? 'inactive',
     }))
     users.value = ((userData as UserRead[]) || []).filter((item) => item.role !== 'super_admin')
     groups.value = (groupData as DeviceGroupRead[]) || []
@@ -249,6 +345,34 @@ function openGroupDialog(row: DeviceRow) {
   currentDeviceId.value = row.device_id
   groupForm.linkage_group_id = row.linkage_group_id || undefined
   groupDialogVisible.value = true
+}
+
+async function submitDevice() {
+  const valid = await deviceFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+
+  submitting.value = true
+  try {
+    if (deviceDialogMode.value === 'create') {
+      await createDeviceApi({
+        name: deviceForm.name.trim(),
+        serial_number: deviceForm.serial_number.trim(),
+      })
+      ElMessage.success(t('devices.createSuccess'))
+    } else if (currentDeviceId.value) {
+      await updateDeviceApi(currentDeviceId.value, {
+        name: deviceForm.name.trim(),
+        status: deviceForm.status,
+      })
+      ElMessage.success(t('devices.updateSuccess'))
+    }
+    deviceDialogVisible.value = false
+    await fetchDevices()
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.detail || t('devices.saveFailed'))
+  } finally {
+    submitting.value = false
+  }
 }
 
 async function submitOwner() {
@@ -310,14 +434,34 @@ async function submitBind() {
   }
 }
 
+async function handleDeleteDevice(row: DeviceRow) {
+  if (!isAdmin.value) {
+    ElMessage.error(t('auth.forbidden'))
+    return
+  }
+  try {
+    await ElMessageBox.confirm(t('devices.deleteConfirm'), t('devices.deleteTitle'), {
+      type: 'warning',
+    })
+    await deleteDeviceApi(row.device_id)
+    ElMessage.success(t('devices.deleteSuccess'))
+    await fetchDevices()
+  } catch (err: any) {
+    if (err === 'cancel' || err?.message === 'cancel') return
+    ElMessage.error(err.response?.data?.detail || t('devices.deleteFailed'))
+  }
+}
+
 async function handleUnbind(deviceId: number) {
   try {
-    const confirmed = window.confirm(t('devices.unbindConfirm'))
-    if (!confirmed) return
+    await ElMessageBox.confirm(t('devices.unbindConfirm'), t('devices.unbind'), {
+      type: 'warning',
+    })
     await unbindDeviceApi(deviceId)
     ElMessage.success(t('devices.unbindSuccess'))
     await fetchDevices()
   } catch (err: any) {
+    if (err === 'cancel' || err?.message === 'cancel') return
     ElMessage.error(err.response?.data?.detail || t('devices.unbindError'))
   }
 }
