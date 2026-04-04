@@ -6,13 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.alarm import AlarmRecordCreate, AlarmRecordRead, AlarmRecordRecover
+from app.schemas.alarm import AlarmRecordCreate, AlarmRecordPage, AlarmRecordRead, AlarmRecordRecover
 from app.services.alarm_service import (
     can_access_device,
     create_alarm_record,
     get_alarm_by_id,
     get_module_with_device,
     list_alarm_records,
+    list_alarm_records_page,
     recover_alarm_record,
 )
 from app.services.linkage_service import dispatch_linkage_for_alarm, dispatch_recovery_for_alarm
@@ -47,6 +48,43 @@ async def read_alarm_records(
         triggered_to=triggered_to,
     )
     return [AlarmRecordRead.model_validate(alarm) for alarm in alarms]
+
+
+@router.get("/page", response_model=AlarmRecordPage)
+async def read_alarm_records_page(
+    alarm_type: str | None = Query(default=None),
+    alarm_status: str | None = Query(default=None),
+    module_id: int | None = Query(default=None),
+    device_id: int | None = Query(default=None),
+    source: str | None = Query(default=None),
+    linkage_status: str | None = Query(default=None),
+    triggered_from: datetime | None = Query(default=None),
+    triggered_to: datetime | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> AlarmRecordPage:
+    total, alarms = await list_alarm_records_page(
+        db=db,
+        user=current_user,
+        alarm_type=alarm_type,
+        alarm_status=alarm_status,
+        module_id=module_id,
+        device_id=device_id,
+        source=source,
+        linkage_status=linkage_status,
+        triggered_from=triggered_from,
+        triggered_to=triggered_to,
+        limit=limit,
+        offset=offset,
+    )
+    return AlarmRecordPage(
+        total=total,
+        items=[AlarmRecordRead.model_validate(alarm) for alarm in alarms],
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.post("", response_model=AlarmRecordRead, status_code=status.HTTP_201_CREATED)

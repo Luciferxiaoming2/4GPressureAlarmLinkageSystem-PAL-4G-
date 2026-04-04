@@ -13,10 +13,13 @@ from app.schemas.device import (
     DeviceGroupAssign,
     DeviceGroupCreate,
     DeviceGroupDeleteResult,
+    DeviceGroupPage,
     DeviceGroupRead,
+    DeviceMonitoringPage,
     DeviceGroupUpdate,
     DeviceMonitoringItem,
     DeviceOverview,
+    DevicePage,
     DeviceRead,
     DeviceStatistics,
     DeviceUpdate,
@@ -44,11 +47,14 @@ from app.services.device_service import (
     get_device_monitoring_list,
     get_device_by_serial_number,
     get_device_overview,
+    get_device_monitoring_page,
     get_device_statistics,
     get_module_by_id,
     get_module_by_code,
     list_device_groups,
+    list_device_groups_page,
     list_devices,
+    list_devices_page,
     get_module_status_history_page,
     unbind_device,
     update_device_group,
@@ -71,6 +77,16 @@ async def read_device_groups(
 ) -> list[DeviceGroupRead]:
     groups = await list_device_groups(db, current_user)
     return [build_device_group_read(group) for group in groups]
+
+
+@router.get("/groups/page", response_model=DeviceGroupPage)
+async def read_device_groups_page(
+    limit: int = 20,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DeviceGroupPage:
+    return await list_device_groups_page(db, current_user, limit=limit, offset=offset)
 
 
 @router.post("/groups", response_model=DeviceGroupRead, status_code=status.HTTP_201_CREATED)
@@ -207,6 +223,16 @@ async def read_device_monitoring(
     return await get_device_monitoring_list(db, current_user)
 
 
+@router.get("/monitoring/page", response_model=DeviceMonitoringPage)
+async def read_device_monitoring_page(
+    limit: int = 20,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DeviceMonitoringPage:
+    return await get_device_monitoring_page(db, current_user, limit=limit, offset=offset)
+
+
 @router.post("/bind", response_model=DeviceRead, status_code=status.HTTP_201_CREATED)
 async def bind_device(
     payload: DeviceBind,
@@ -238,6 +264,22 @@ async def read_devices(
 ) -> list[DeviceRead]:
     devices = await list_devices(db, current_user)
     return [DeviceRead.model_validate(device) for device in devices]
+
+
+@router.get("/page", response_model=DevicePage)
+async def read_devices_page(
+    limit: int = 20,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DevicePage:
+    page = await list_devices_page(db, current_user, limit=limit, offset=offset)
+    return DevicePage(
+        total=page.total,
+        items=[DeviceRead.model_validate(device) for device in page.items],
+        limit=page.limit,
+        offset=page.offset,
+    )
 
 
 @router.get("/modules/{module_id}", response_model=ModuleDetail)

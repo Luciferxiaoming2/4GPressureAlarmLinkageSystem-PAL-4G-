@@ -18,10 +18,13 @@ from app.schemas.device import (
     DeviceBind,
     DeviceCreate,
     DeviceGroupCreate,
+    DeviceGroupPage,
     DeviceGroupRead,
     DeviceGroupUpdate,
     DeviceMonitoringItem,
+    DeviceMonitoringPage,
     DeviceOverview,
+    DevicePage,
     DeviceStatistics,
     DeviceUpdate,
     ModuleCreate,
@@ -42,6 +45,28 @@ async def list_devices(db: AsyncSession, user: User) -> list[Device]:
     stmt = stmt.order_by(Device.id.desc())
     result = await db.execute(stmt)
     return list(result.scalars().unique().all())
+
+
+async def list_devices_page(
+    db: AsyncSession,
+    user: User,
+    limit: int = 20,
+    offset: int = 0,
+) -> DevicePage:
+    count_stmt = select(func.count(Device.id))
+    stmt = (
+        select(Device)
+        .options(selectinload(Device.modules))
+        .order_by(Device.id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    if user.role != "super_admin":
+        count_stmt = count_stmt.where(Device.owner_id == user.id)
+        stmt = stmt.where(Device.owner_id == user.id)
+    total = (await db.execute(count_stmt)).scalar_one() or 0
+    items = list((await db.execute(stmt)).scalars().unique().all())
+    return DevicePage(total=total, items=items, limit=limit, offset=offset)
 
 
 async def get_device_by_id(db: AsyncSession, device_id: int) -> Device | None:
@@ -89,6 +114,29 @@ async def list_device_groups(db: AsyncSession, user: User) -> list[DeviceGroup]:
     if user.role != "super_admin":
         stmt = stmt.where(DeviceGroup.owner_id == user.id)
     return list((await db.execute(stmt)).scalars().unique().all())
+
+
+async def list_device_groups_page(
+    db: AsyncSession,
+    user: User,
+    limit: int = 20,
+    offset: int = 0,
+) -> DeviceGroupPage:
+    count_stmt = select(func.count(DeviceGroup.id))
+    stmt = (
+        select(DeviceGroup)
+        .options(selectinload(DeviceGroup.devices))
+        .order_by(DeviceGroup.id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    if user.role != "super_admin":
+        count_stmt = count_stmt.where(DeviceGroup.owner_id == user.id)
+        stmt = stmt.where(DeviceGroup.owner_id == user.id)
+    total = (await db.execute(count_stmt)).scalar_one() or 0
+    groups = list((await db.execute(stmt)).scalars().unique().all())
+    items = [build_device_group_read(group) for group in groups]
+    return DeviceGroupPage(total=total, items=items, limit=limit, offset=offset)
 
 
 async def get_device_group_by_id(db: AsyncSession, group_id: int) -> DeviceGroup | None:
@@ -577,3 +625,15 @@ async def get_device_monitoring_list(
         )
 
     return monitoring_items
+
+
+async def get_device_monitoring_page(
+    db: AsyncSession,
+    user: User,
+    limit: int = 20,
+    offset: int = 0,
+) -> DeviceMonitoringPage:
+    items = await get_device_monitoring_list(db, user)
+    total = len(items)
+    paged_items = items[offset : offset + limit]
+    return DeviceMonitoringPage(total=total, items=paged_items, limit=limit, offset=offset)

@@ -11,6 +11,7 @@ from app.models.user import User
 from app.schemas.relay import (
     RelayCommandCreate,
     RelayCommandFeedback,
+    RelayCommandPage,
     RelayCommandRead,
     RelayRetryResult,
 )
@@ -19,6 +20,7 @@ from app.services.linkage_service import (
     create_manual_relay_command,
     get_relay_command_by_id,
     list_relay_commands,
+    list_relay_commands_page,
     retry_queued_relay_commands,
 )
 from app.services.logging_service import write_communication_log, write_operation_log
@@ -53,6 +55,30 @@ async def read_relay_commands(
         execution_status=execution_status,
     )
     return [RelayCommandRead.model_validate(command) for command in commands]
+
+
+@router.get("/page", response_model=RelayCommandPage)
+async def read_relay_commands_page(
+    alarm_record_id: int | None = Query(default=None),
+    execution_status: str | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    _: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> RelayCommandPage:
+    total, commands = await list_relay_commands_page(
+        db,
+        alarm_record_id=alarm_record_id,
+        execution_status=execution_status,
+        limit=limit,
+        offset=offset,
+    )
+    return RelayCommandPage(
+        total=total,
+        items=[RelayCommandRead.model_validate(command) for command in commands],
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.post("/retry-pending", response_model=RelayRetryResult)

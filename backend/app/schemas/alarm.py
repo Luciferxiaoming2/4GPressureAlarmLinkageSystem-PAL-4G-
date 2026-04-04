@@ -39,3 +39,10 @@ class AlarmRecordRead(BaseModel):
     recovered_at: datetime | None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AlarmRecordPage(BaseModel):
+    total: int
+    items: list[AlarmRecordRead]
+    limit: int
+    offset: int

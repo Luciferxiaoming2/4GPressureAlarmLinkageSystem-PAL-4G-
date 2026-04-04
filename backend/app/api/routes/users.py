@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_admin, get_current_user
@@ -7,6 +8,7 @@ from app.models.user import User
 from app.schemas.user import (
     UserChangePassword,
     UserCreate,
+    UserPage,
     UserRead,
     UserResetPassword,
     UserUpdate,
@@ -19,6 +21,7 @@ from app.services.user_service import (
     get_user_by_id,
     get_user_by_username,
     list_users,
+    list_users_page,
     reset_user_password,
     update_user,
 )
@@ -33,6 +36,22 @@ async def read_users(
 ) -> list[UserRead]:
     users = await list_users(db)
     return [UserRead.model_validate(user) for user in users]
+
+
+@router.get("/page", response_model=UserPage)
+async def read_users_page(
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    _: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> UserPage:
+    total, users = await list_users_page(db, limit=limit, offset=offset)
+    return UserPage(
+        total=total,
+        items=[UserRead.model_validate(user) for user in users],
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)

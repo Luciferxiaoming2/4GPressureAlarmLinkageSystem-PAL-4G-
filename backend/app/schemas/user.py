@@ -33,3 +33,10 @@ class UserRead(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserPage(BaseModel):
+    total: int
+    items: list[UserRead]
+    limit: int
+    offset: int

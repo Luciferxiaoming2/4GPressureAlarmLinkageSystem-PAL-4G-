@@ -37,3 +37,10 @@ class RelayRetryResult(BaseModel):
     total_scanned: int
     dispatched_count: int
     still_queued_count: int
+
+
+class RelayCommandPage(BaseModel):
+    total: int
+    items: list[RelayCommandRead]
+    limit: int
+    offset: int

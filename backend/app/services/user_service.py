@@ -25,6 +25,18 @@ async def list_users(db: AsyncSession) -> list[User]:
     return list(result.scalars().all())
 
 
+async def list_users_page(
+    db: AsyncSession,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[int, list[User]]:
+    count_stmt = select(func.count(User.id))
+    stmt = select(User).order_by(User.id.desc()).limit(limit).offset(offset)
+    total = (await db.execute(count_stmt)).scalar_one() or 0
+    users = list((await db.execute(stmt)).scalars().all())
+    return total, users
+
+
 async def create_user(db: AsyncSession, payload: UserCreate) -> User:
     # 统一在服务层做密码哈希，避免路由层直接处理敏感字段。
     user = User(

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -93,6 +93,76 @@ async def list_alarm_records(
     stmt = stmt.order_by(AlarmRecord.triggered_at.desc(), AlarmRecord.id.desc())
     result = await db.execute(stmt)
     return list(result.scalars().all())
+
+
+async def list_alarm_records_page(
+    db: AsyncSession,
+    user: User,
+    alarm_type: str | None = None,
+    alarm_status: str | None = None,
+    module_id: int | None = None,
+    device_id: int | None = None,
+    source: str | None = None,
+    linkage_status: str | None = None,
+    triggered_from: datetime | None = None,
+    triggered_to: datetime | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[int, list[AlarmRecord]]:
+    base_stmt = (
+        select(AlarmRecord)
+        .join(Module, AlarmRecord.module_id == Module.id)
+        .join(Device, Module.device_id == Device.id)
+    )
+
+    if user.role != "super_admin":
+        base_stmt = base_stmt.where(Device.owner_id == user.id)
+    if alarm_type:
+        base_stmt = base_stmt.where(AlarmRecord.alarm_type == alarm_type)
+    if alarm_status:
+        base_stmt = base_stmt.where(AlarmRecord.alarm_status == alarm_status)
+    if module_id:
+        base_stmt = base_stmt.where(AlarmRecord.module_id == module_id)
+    if device_id:
+        base_stmt = base_stmt.where(Device.id == device_id)
+    if source:
+        base_stmt = base_stmt.where(AlarmRecord.source == source)
+    if linkage_status:
+        base_stmt = base_stmt.where(AlarmRecord.linkage_status == linkage_status)
+    if triggered_from:
+        base_stmt = base_stmt.where(AlarmRecord.triggered_at >= triggered_from)
+    if triggered_to:
+        base_stmt = base_stmt.where(AlarmRecord.triggered_at <= triggered_to)
+
+    count_stmt = (
+        select(func.count())
+        .select_from(AlarmRecord)
+        .join(Module, AlarmRecord.module_id == Module.id)
+        .join(Device, Module.device_id == Device.id)
+    )
+    if user.role != "super_admin":
+        count_stmt = count_stmt.where(Device.owner_id == user.id)
+    if alarm_type:
+        count_stmt = count_stmt.where(AlarmRecord.alarm_type == alarm_type)
+    if alarm_status:
+        count_stmt = count_stmt.where(AlarmRecord.alarm_status == alarm_status)
+    if module_id:
+        count_stmt = count_stmt.where(AlarmRecord.module_id == module_id)
+    if device_id:
+        count_stmt = count_stmt.where(Device.id == device_id)
+    if source:
+        count_stmt = count_stmt.where(AlarmRecord.source == source)
+    if linkage_status:
+        count_stmt = count_stmt.where(AlarmRecord.linkage_status == linkage_status)
+    if triggered_from:
+        count_stmt = count_stmt.where(AlarmRecord.triggered_at >= triggered_from)
+    if triggered_to:
+        count_stmt = count_stmt.where(AlarmRecord.triggered_at <= triggered_to)
+
+    stmt = base_stmt.order_by(AlarmRecord.triggered_at.desc(), AlarmRecord.id.desc()).limit(limit).offset(offset)
+    total = (await db.execute(count_stmt)).scalar_one() or 0
+    items = list((await db.execute(stmt)).scalars().all())
+    return total, items
 
 
 async def recover_alarm_record(

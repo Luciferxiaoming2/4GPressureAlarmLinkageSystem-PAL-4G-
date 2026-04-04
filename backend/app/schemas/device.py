@@ -102,6 +102,13 @@ class DeviceOverview(BaseModel):
     triggered_alarm_count: int
 
 
+class DevicePage(BaseModel):
+    total: int
+    items: list[DeviceRead]
+    limit: int
+    offset: int
+
+
 class DeviceStatistics(BaseModel):
     total_devices: int
     owned_devices: int
@@ -164,6 +171,20 @@ class DeviceGroupRead(BaseModel):
     device_ids: list[int] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DeviceGroupPage(BaseModel):
+    total: int
+    items: list[DeviceGroupRead]
+    limit: int
+    offset: int
+
+
+class DeviceMonitoringPage(BaseModel):
+    total: int
+    items: list[DeviceMonitoringItem]
+    limit: int
+    offset: int
 
 
 class DeviceGroupDeleteResult(BaseModel):

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -366,6 +366,27 @@ async def list_relay_commands(
     if execution_status:
         stmt = stmt.where(RelayCommand.execution_status == execution_status)
     return list((await db.execute(stmt)).scalars().all())
+
+
+async def list_relay_commands_page(
+    db: AsyncSession,
+    alarm_record_id: int | None = None,
+    execution_status: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[int, list[RelayCommand]]:
+    count_stmt = select(func.count(RelayCommand.id))
+    stmt = select(RelayCommand).order_by(RelayCommand.created_at.desc(), RelayCommand.id.desc())
+    if alarm_record_id:
+        count_stmt = count_stmt.where(RelayCommand.alarm_record_id == alarm_record_id)
+        stmt = stmt.where(RelayCommand.alarm_record_id == alarm_record_id)
+    if execution_status:
+        count_stmt = count_stmt.where(RelayCommand.execution_status == execution_status)
+        stmt = stmt.where(RelayCommand.execution_status == execution_status)
+
+    total = (await db.execute(count_stmt)).scalar_one() or 0
+    items = list((await db.execute(stmt.limit(limit).offset(offset))).scalars().all())
+    return total, items
 
 
 async def get_relay_command_by_id(
