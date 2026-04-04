@@ -15,6 +15,7 @@ from app.services.logging_service import write_operation_log
 from app.services.user_service import (
     change_user_password,
     create_user,
+    delete_user,
     get_user_by_id,
     get_user_by_username,
     list_users,
@@ -95,6 +96,38 @@ async def patch_user(
         detail=f"updated user {updated_user.username}",
     )
     return UserRead.model_validate(updated_user)
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_200_OK)
+async def remove_user(
+    user_id: int,
+    current_admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, int | bool]:
+    user = await get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.id == current_admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current admin cannot delete self",
+        )
+
+    username = user.username
+    try:
+        await delete_user(db, user)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    await write_operation_log(
+        db,
+        action="delete_user",
+        target_type="user",
+        actor_user_id=current_admin.id,
+        target_id=user_id,
+        detail=f"deleted user {username}",
+    )
+    return {"deleted": True, "user_id": user_id}
 
 
 @router.post("/{user_id}/reset-password", response_model=UserRead)

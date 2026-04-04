@@ -1,8 +1,11 @@
-from sqlalchemy import select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.security import get_password_hash, verify_password
+from app.models.device import Device
+from app.models.device_group import DeviceGroup
+from app.models.operation_log import OperationLog
 from app.models.user import User
 from app.schemas.user import UserChangePassword, UserCreate, UserResetPassword, UserUpdate
 
@@ -73,6 +76,35 @@ async def change_user_password(
     await db.commit()
     await db.refresh(user)
     return user
+
+
+async def delete_user(db: AsyncSession, user: User) -> None:
+    # 安全删除前先校验该用户是否还挂着设备，避免把设备归属关系直接打断。
+    owned_device_count = (
+        await db.execute(
+            select(func.count(Device.id)).where(Device.owner_id == user.id)
+        )
+    ).scalar_one()
+    if owned_device_count > 0:
+        raise ValueError("User still owns devices and cannot be deleted")
+
+    # 设备分组也可能绑定 owner_id，删除前同样需要清掉这类阻塞关系。
+    owned_group_count = (
+        await db.execute(
+            select(func.count(DeviceGroup.id)).where(DeviceGroup.owner_id == user.id)
+        )
+    ).scalar_one()
+    if owned_group_count > 0:
+        raise ValueError("User still owns device groups and cannot be deleted")
+
+    # 操作日志保留历史，但把外键置空，避免删除用户时触发约束错误。
+    await db.execute(
+        update(OperationLog)
+        .where(OperationLog.actor_user_id == user.id)
+        .values(actor_user_id=None)
+    )
+    await db.execute(delete(User).where(User.id == user.id))
+    await db.commit()
 
 
 async def ensure_default_admin(db: AsyncSession) -> None:
