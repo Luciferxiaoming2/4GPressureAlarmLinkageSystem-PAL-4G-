@@ -5,17 +5,25 @@ import { useSettingsStore } from '@/stores/settings'
 
 function resolvePath(path: string, locale: string) {
   const segments = path.split('.')
-  let current: any = messages[locale as keyof typeof messages]
+  const resolveFromLocale = (targetLocale: string) => {
+    let current: any = messages[targetLocale as keyof typeof messages]
 
-  for (const segment of segments) {
-    if (current && typeof current === 'object' && segment in current) {
-      current = current[segment]
-    } else {
-      return path
+    for (const segment of segments) {
+      if (current && typeof current === 'object' && segment in current) {
+        current = current[segment]
+      } else {
+        return null
+      }
     }
+
+    return typeof current === 'string' ? current : null
   }
 
-  return typeof current === 'string' ? current : path
+  if (locale === 'zh-CN') {
+    return resolveFromLocale(locale) ?? path
+  }
+
+  return resolveFromLocale(locale) ?? resolveFromLocale('en-US') ?? path
 }
 
 export function useI18n() {

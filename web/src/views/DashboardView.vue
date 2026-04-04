@@ -86,7 +86,7 @@
                   </el-table-column>
                   <el-table-column :label="t('dashboard.monitoring.latestAlarm')" min-width="140">
                     <template #default="{ row }">
-                      {{ row.latest_alarm_type || '--' }}
+                      {{ resolveAlarmTypeLabel(row.latest_alarm_type, t) }}
                     </template>
                   </el-table-column>
                   <el-table-column :label="t('dashboard.monitoring.alarmTime')" min-width="180">
@@ -105,7 +105,7 @@
                 <article v-for="item in recentAlarms" :key="item.id" class="dashboard-stream__item">
                   <div class="dashboard-stream__main">
                     <strong>{{ item.device_name }} / {{ item.module_code }}</strong>
-                    <p>{{ item.message || item.alarm_type }}</p>
+                    <p>{{ item.message || resolveAlarmTypeLabel(item.alarm_type, t) }}</p>
                   </div>
                   <div class="dashboard-stream__meta">
                     <StatusPill :value="item.alarm_status" :mapping="alarmStatusMeta" />
@@ -122,7 +122,7 @@
                 <article v-for="item in recentCommands" :key="item.id" class="dashboard-stream__item">
                   <div class="dashboard-stream__main">
                     <strong>{{ item.device_name }} / {{ item.module_code }}</strong>
-                    <p>{{ item.feedback_message || item.target_state }}</p>
+                    <p>{{ item.feedback_message || resolveRelayTargetLabel(item.target_state, t) }}</p>
                   </div>
                   <div class="dashboard-stream__meta">
                     <StatusPill :value="item.execution_status" :mapping="commandStatusMeta" />
@@ -163,6 +163,7 @@ import type {
   DashboardRelayCommandItem,
 } from '@/types/domain'
 import { formatDateTime } from '@/utils/format'
+import { resolveAlarmTypeLabel, resolveRelayTargetLabel } from '@/utils/labels'
 import { alarmStatusMeta, commandStatusMeta, deviceStatusMeta } from '@/utils/status'
 
 const { t } = useI18n()

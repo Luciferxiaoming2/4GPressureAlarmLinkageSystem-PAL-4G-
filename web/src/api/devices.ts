@@ -1,11 +1,16 @@
 import { http } from './http'
 import type {
   DeviceBindPayload,
+  DeviceCreatePayload,
+  DeviceDeleteResult,
   DeviceGroupCreatePayload,
   DeviceGroupRead,
   DeviceGroupUpdatePayload,
   DeviceMonitoringItem,
   DeviceRead,
+  DeviceUpdatePayload,
+  ModuleCreatePayload,
+  ModuleDeleteResult,
   RelayCommandCreatePayload,
 } from '@/types/domain'
 
@@ -24,8 +29,23 @@ export async function getDevicesApi() {
   return data
 }
 
+export async function createDeviceApi(payload: DeviceCreatePayload) {
+  const { data } = await http.post<DeviceRead>('/devices', payload)
+  return data
+}
+
 export async function getDeviceApi(deviceId: number) {
   const { data } = await http.get<DeviceRead>(`/devices/${deviceId}`)
+  return data
+}
+
+export async function updateDeviceApi(deviceId: number, payload: DeviceUpdatePayload) {
+  const { data } = await http.patch<DeviceRead>(`/devices/${deviceId}`, payload)
+  return data
+}
+
+export async function deleteDeviceApi(deviceId: number) {
+  const { data } = await http.delete<DeviceDeleteResult>(`/devices/${deviceId}`)
   return data
 }
 
@@ -70,5 +90,15 @@ export async function assignDeviceGroupApi(deviceId: number, linkageGroupId: num
 
 export async function unbindDeviceApi(deviceId: number) {
   const { data } = await http.post<DeviceRead>(`/devices/${deviceId}/unbind`)
+  return data
+}
+
+export async function createDeviceModuleApi(deviceId: number, payload: ModuleCreatePayload) {
+  const { data } = await http.post<DeviceRead>(`/devices/${deviceId}/modules`, payload)
+  return data
+}
+
+export async function deleteDeviceModuleApi(moduleId: number) {
+  const { data } = await http.delete<ModuleDeleteResult>(`/devices/modules/${moduleId}`)
   return data
 }

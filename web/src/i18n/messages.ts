@@ -735,6 +735,23 @@ export const messages: Record<LocaleCode, MessageTree> = {
       title: 'Device Management',
       description: 'Review device health and, for administrators, manage owners and linkage groups.',
       searchPlaceholder: 'Search device name or SN',
+      createDevice: 'Create Device',
+      editDevice: 'Edit Device',
+      deleteDevice: 'Delete Device',
+      createDialogTitle: 'Create Device',
+      editDialogTitle: 'Edit Device',
+      nameLabel: 'Device Name',
+      namePlaceholder: 'Enter device name',
+      serialLabel: 'Device Serial Number',
+      serialPlaceholder: 'Enter device SN',
+      statusLabel: 'Device Business Status',
+      createSuccess: 'Device created',
+      updateSuccess: 'Device updated',
+      saveFailed: 'Failed to save device',
+      deleteSuccess: 'Device deleted',
+      deleteFailed: 'Failed to delete device',
+      deleteConfirm: 'Make sure this device has no modules before deleting it. Continue?',
+      deleteTitle: 'Delete Device',
       bindDevice: 'Bind Device',
       bindDialogTitle: 'Bind Device to Current Account',
       bindDescription: 'Add a device to the current account by serial number.',
@@ -767,6 +784,7 @@ export const messages: Record<LocaleCode, MessageTree> = {
         latestAlarmTime: 'Alarm Time',
       },
       validations: {
+        nameRequired: 'Device name is required',
         serialRequired: 'Device SN is required',
       },
       loadError: 'Failed to load devices',
@@ -774,6 +792,24 @@ export const messages: Record<LocaleCode, MessageTree> = {
     deviceDetail: {
       title: 'Device Detail',
       description: 'Inspect module status, recent alarms, command history, and manual relay controls.',
+      editDevice: 'Edit Device',
+      addModule: 'Add Module',
+      deleteDevice: 'Delete Device',
+      manageTitle: 'Device Configuration',
+      manageDesc: 'Maintain base device information and review module configuration constraints.',
+      modulesTitle: 'Module Management',
+      modulesDesc: 'Add module codes or delete modules that have no historical records.',
+      addModuleDialogTitle: 'Add Module',
+      moduleCodeLabel: 'Module Code',
+      moduleCodePlaceholder: 'Enter module code',
+      moduleAddSuccess: 'Module added',
+      moduleAddFailed: 'Failed to add module',
+      moduleDeleteSuccess: 'Module deleted',
+      moduleDeleteFailed: 'Failed to delete module',
+      moduleDeleteConfirm: 'Only modules without alarm or command history can be deleted. Continue?',
+      moduleDeleteTitle: 'Delete Module',
+      deleteDeviceConfirm: 'Only empty devices can be deleted, and this action cannot be undone. Continue?',
+      deleteDeviceTitle: 'Delete Device',
       overviewTitle: 'Device Overview',
       overviewDesc: 'Built from monitoring aggregation and base device data',
       controlTitle: 'Module Controls',
@@ -786,6 +822,7 @@ export const messages: Record<LocaleCode, MessageTree> = {
       noAlarms: 'No alarm records',
       noCommands: 'No command records',
       fields: {
+        deviceName: 'Device Name',
         serial: 'Device SN',
         status: 'Device Status',
         moduleCount: 'Module Count',
@@ -796,6 +833,10 @@ export const messages: Record<LocaleCode, MessageTree> = {
         feedbackMessage: 'Feedback',
       },
       loadError: 'Failed to load device detail',
+      updateSuccess: 'Device information updated',
+      updateFailed: 'Failed to update device information',
+      deleteSuccess: 'Device deleted',
+      deleteFailed: 'Failed to delete device',
       commandCreated: 'Command created',
       commandCreateFailed: 'Failed to send command',
     },
@@ -834,6 +875,7 @@ export const messages: Record<LocaleCode, MessageTree> = {
     users: {
       title: 'User Management',
       description: 'Administrators can create, edit, enable, disable, and reset users.',
+      deleteUnavailable: 'The backend does not provide a delete-user API yet. Disable the user instead.',
       createUser: 'Create User',
       editUser: 'Edit User',
       resetPassword: 'Reset Password',
@@ -988,3 +1030,70 @@ export const messages: Record<LocaleCode, MessageTree> = {
     },
   },
 }
+
+const zhCnOverrides: Record<string, string> = {
+  'devices.createDevice': '新增设备',
+  'devices.editDevice': '编辑设备',
+  'devices.deleteDevice': '删除设备',
+  'devices.createDialogTitle': '新增设备',
+  'devices.editDialogTitle': '编辑设备',
+  'devices.nameLabel': '设备名称',
+  'devices.namePlaceholder': '请输入设备名称',
+  'devices.serialLabel': '设备序列号',
+  'devices.serialPlaceholder': '请输入设备 SN',
+  'devices.statusLabel': '设备业务状态',
+  'devices.createSuccess': '设备已创建',
+  'devices.updateSuccess': '设备已更新',
+  'devices.saveFailed': '设备保存失败',
+  'devices.deleteSuccess': '设备已删除',
+  'devices.deleteFailed': '删除设备失败',
+  'devices.deleteConfirm': '删除设备前请确保其下已无模块，是否继续？',
+  'devices.deleteTitle': '删除设备',
+  'devices.validations.nameRequired': '请输入设备名称',
+  'deviceDetail.editDevice': '编辑设备',
+  'deviceDetail.addModule': '新增模块',
+  'deviceDetail.deleteDevice': '删除设备',
+  'deviceDetail.manageTitle': '设备配置管理',
+  'deviceDetail.manageDesc': '维护设备基础信息，并查看模块配置与删除限制。',
+  'deviceDetail.modulesTitle': '模块管理',
+  'deviceDetail.modulesDesc': '新增模块编号，或在无历史记录时删除模块。',
+  'deviceDetail.addModuleDialogTitle': '新增模块',
+  'deviceDetail.moduleCodeLabel': '模块编号',
+  'deviceDetail.moduleCodePlaceholder': '请输入模块编号',
+  'deviceDetail.moduleAddSuccess': '模块已新增',
+  'deviceDetail.moduleAddFailed': '新增模块失败',
+  'deviceDetail.moduleDeleteSuccess': '模块已删除',
+  'deviceDetail.moduleDeleteFailed': '删除模块失败',
+  'deviceDetail.moduleDeleteConfirm': '仅无历史报警和指令记录的模块可删除，是否继续？',
+  'deviceDetail.moduleDeleteTitle': '删除模块',
+  'deviceDetail.deleteDeviceConfirm': '仅空设备可删除，删除后不可恢复，是否继续？',
+  'deviceDetail.deleteDeviceTitle': '删除设备',
+  'deviceDetail.fields.deviceName': '设备名称',
+  'deviceDetail.updateSuccess': '设备信息已更新',
+  'deviceDetail.updateFailed': '更新设备信息失败',
+  'deviceDetail.deleteSuccess': '设备已删除',
+  'deviceDetail.deleteFailed': '删除设备失败',
+  'users.deleteUnavailable': '当前后端尚未提供删除用户接口，请先使用禁用用户作为替代方案。',
+}
+
+function applyOverrides(tree: MessageTree, overrides: Record<string, string>) {
+  for (const [path, value] of Object.entries(overrides)) {
+    const segments = path.split('.')
+    let current = tree
+
+    for (let index = 0; index < segments.length - 1; index += 1) {
+      const segment = segments[index]
+      const next = current[segment]
+
+      if (!next || typeof next === 'string') {
+        current[segment] = {}
+      }
+
+      current = current[segment] as MessageTree
+    }
+
+    current[segments[segments.length - 1]] = value
+  }
+}
+
+applyOverrides(messages['zh-CN'], zhCnOverrides)

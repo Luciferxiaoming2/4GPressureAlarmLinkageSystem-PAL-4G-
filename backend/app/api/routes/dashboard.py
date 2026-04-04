@@ -60,10 +60,31 @@ async def read_dashboard_recent_alarms(
 async def read_dashboard_alarm_page(
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    keyword: str | None = Query(default=None, min_length=1, max_length=128),
+    alarm_type: str | None = Query(default=None),
+    alarm_status: str | None = Query(default=None),
+    source: str | None = Query(default=None),
+    linkage_status: str | None = Query(default=None),
+    triggered_from: str | None = Query(default=None),
+    triggered_to: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> DashboardAlarmPage:
-    return await get_dashboard_alarm_page(db, current_user, limit=limit, offset=offset)
+    from datetime import datetime
+
+    return await get_dashboard_alarm_page(
+        db,
+        current_user,
+        limit=limit,
+        offset=offset,
+        keyword=keyword,
+        alarm_type=alarm_type,
+        alarm_status=alarm_status,
+        source=source,
+        linkage_status=linkage_status,
+        triggered_from=datetime.fromisoformat(triggered_from) if triggered_from else None,
+        triggered_to=datetime.fromisoformat(triggered_to) if triggered_to else None,
+    )
 
 
 @router.get("/recent-commands", response_model=list[DashboardRelayCommandItem])
