@@ -121,6 +121,34 @@ function resolveAlarmType(alarmType: string | null) {
   line-height: 1.4;
 }
 
+:root[data-theme='light'] .module-card {
+  border-color: rgba(19, 72, 96, 0.14);
+  background:
+    radial-gradient(circle at top right, rgba(14, 165, 183, 0.14), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(240, 247, 249, 0.92));
+  box-shadow:
+    0 18px 34px rgba(76, 111, 126, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+:root[data-theme='light'] .module-card__identity p,
+:root[data-theme='light'] .module-card__identity span,
+:root[data-theme='light'] .module-card__metric span {
+  color: var(--pal-text-muted);
+}
+
+:root[data-theme='light'] .module-card__identity strong,
+:root[data-theme='light'] .module-card__metric strong {
+  color: var(--pal-text);
+}
+
+:root[data-theme='light'] .module-card__metric {
+  border-color: rgba(19, 72, 96, 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(234, 242, 245, 0.82));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
+}
+
 @media (max-width: 640px) {
   .module-card__head {
     flex-direction: column;
