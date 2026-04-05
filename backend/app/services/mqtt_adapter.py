@@ -2,7 +2,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.device import Device
 from app.models.module import Module
 from app.schemas.device import ModuleStatusReport
 from app.schemas.mqtt import MqttRelayFeedbackMessage, MqttStatusMessage
@@ -30,19 +29,11 @@ async def get_module_by_serial_and_code(
     # 新模型优先按模块自身 SN 定位；旧数据继续兼容“设备 SN + 模块编码”。
     stmt = (
         select(Module)
+        .join(Module.device)
         .options(selectinload(Module.device))
-        .where(Module.serial_number == serial_number, Module.module_code == module_code)
-    )
-    result = await db.execute(stmt)
-    module = result.scalar_one_or_none()
-    if module:
-        return module
-
-    stmt = (
-        select(Module)
-        .join(Device, Module.device_id == Device.id)
-        .options(selectinload(Module.device))
-        .where(Device.serial_number == serial_number, Module.module_code == module_code)
+        .where(Module.device.has(serial_number=serial_number))
+        .order_by(Module.id.asc())
+        .limit(1)
     )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()

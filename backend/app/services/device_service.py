@@ -37,6 +37,41 @@ from app.services.logging_service import write_communication_log
 from app.services.realtime_service import realtime_service
 
 
+async def get_primary_module_by_device_id(
+    db: AsyncSession,
+    device_id: int,
+) -> Module | None:
+    stmt = (
+        select(Module)
+        .options(selectinload(Module.device))
+        .where(Module.device_id == device_id)
+        .order_by(Module.id.asc())
+        .limit(1)
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def _ensure_primary_module(
+    db: AsyncSession,
+    device: Device,
+) -> Module:
+    # 当前业务按“一个设备一个 SN”处理，这里保留一个默认模块做内部兼容层。
+    existing_module = await get_primary_module_by_device_id(db, device.id)
+    if existing_module:
+        return existing_module
+
+    module = Module(
+        device_id=device.id,
+        module_code="MAIN",
+        serial_number=device.serial_number,
+    )
+    db.add(module)
+    await db.commit()
+    await db.refresh(module)
+    return module
+
+
 async def list_devices(db: AsyncSession, user: User) -> list[Device]:
     stmt = select(Device).options(selectinload(Device.modules))
     # 普通用户只能看到自己绑定的设备，管理员可查看全量。
@@ -104,6 +139,7 @@ async def create_device(db: AsyncSession, payload: DeviceCreate, owner: User) ->
     db.add(device)
     await db.commit()
     await db.refresh(device)
+    await _ensure_primary_module(db, device)
     return device
 
 
@@ -237,30 +273,10 @@ async def get_module_by_code(
     return result.scalar_one_or_none()
 
 
-async def get_module_by_serial_number(
-    db: AsyncSession,
-    serial_number: str,
-) -> Module | None:
-    stmt = select(Module).options(selectinload(Module.device)).where(
-        Module.serial_number == serial_number
-    )
-    result = await db.execute(stmt)
-    return result.scalar_one_or_none()
-
-
 async def get_device_by_serial_with_protocol(
     db: AsyncSession,
     serial_number: str,
 ) -> Device | None:
-    module = await get_module_by_serial_number(db, serial_number)
-    if module and module.device:
-        stmt = (
-            select(Device)
-            .options(selectinload(Device.protocol_profile))
-            .where(Device.id == module.device_id)
-        )
-        return (await db.execute(stmt)).scalar_one_or_none()
-
     stmt = (
         select(Device)
         .options(selectinload(Device.protocol_profile))
@@ -280,10 +296,21 @@ async def add_module_to_device(
     device: Device,
     payload: ModuleCreate,
 ) -> Module:
+    # 当前业务不允许一个设备挂多个模块，这里把旧接口收敛成“配置默认模块”。
+    existing_module = await get_primary_module_by_device_id(db, device.id)
+    if existing_module:
+        existing_module.module_code = payload.module_code
+        existing_module.serial_number = device.serial_number
+        if payload.imei is not None:
+            existing_module.imei = payload.imei
+        await db.commit()
+        await db.refresh(existing_module)
+        return existing_module
+
     module = Module(
         device_id=device.id,
         module_code=payload.module_code,
-        serial_number=payload.serial_number or f"{device.serial_number}-{payload.module_code}",
+        serial_number=device.serial_number,
         imei=payload.imei,
     )
     db.add(module)
@@ -299,12 +326,7 @@ async def bind_device_by_serial(
 ) -> Device:
     # 绑定逻辑分两种：已存在但未归属的设备归到当前用户；不存在则按 SN 直接建档。
     # 新模型下优先按模块 SN 绑定所属整套设备，兼容旧的设备级 SN 绑定方式。
-    existing_module = await get_module_by_serial_number(db, payload.serial_number)
-    existing_module = await get_module_by_serial_number(db, payload.serial_number)
-    if existing_module and existing_module.device_id:
-        existing_device = await get_device_by_id(db, existing_module.device_id)
-    else:
-        existing_device = await get_device_by_serial_number(db, payload.serial_number)
+    existing_device = await get_device_by_serial_number(db, payload.serial_number)
     if existing_device:
         if existing_device.owner_id and existing_device.owner_id != current_user.id:
             raise ValueError("Device is already bound to another user")
@@ -325,6 +347,7 @@ async def bind_device_by_serial(
     db.add(device)
     await db.commit()
     await db.refresh(device)
+    await _ensure_primary_module(db, device)
     return device
 
 
@@ -402,6 +425,41 @@ async def delete_device(
     # 设备只有在完全空载时才允许删除，避免把模块历史一起带丢。
     if module_count:
         raise ValueError("Device still has modules and cannot be deleted")
+
+    await db.execute(delete(Device).where(Device.id == device.id))
+    await db.commit()
+
+
+async def delete_device(
+    db: AsyncSession,
+    device: Device,
+) -> None:
+    # 覆盖旧实现：当前业务允许删除仅带一个默认兼容模块、且没有历史记录的设备。
+    modules = list(
+        (
+            await db.execute(
+                select(Module).where(Module.device_id == device.id).order_by(Module.id.asc())
+            )
+        ).scalars().all()
+    )
+    if len(modules) > 1:
+        raise ValueError("Device still has multiple modules and cannot be deleted")
+
+    if len(modules) == 1:
+        module = modules[0]
+        alarm_count = (
+            await db.execute(
+                select(func.count(AlarmRecord.id)).where(AlarmRecord.module_id == module.id)
+            )
+        ).scalar_one()
+        command_count = (
+            await db.execute(
+                select(func.count(RelayCommand.id)).where(RelayCommand.module_id == module.id)
+            )
+        ).scalar_one()
+        if alarm_count or command_count:
+            raise ValueError("Device still has module history and cannot be deleted")
+        await db.execute(delete(Module).where(Module.id == module.id))
 
     await db.execute(delete(Device).where(Device.id == device.id))
     await db.commit()

@@ -30,22 +30,16 @@ async def _get_linkage_target_modules(
     trigger_module: Module,
 ) -> tuple[list[Module], str]:
     # 联动优先按设备组生效；没有分组时再回退到同设备内其他模块。
-    if trigger_module.device and trigger_module.device.linkage_group_id:
-        stmt = (
-            select(Module)
-            .join(Module.device)
-            .where(
-                Device.linkage_group_id == trigger_module.device.linkage_group_id,
-                Module.id != trigger_module.id,
-            )
-        )
-        no_target_message = "no linkage targets found in the same device group"
-    else:
-        stmt = select(Module).where(
-            Module.device_id == trigger_module.device_id,
-            Module.id != trigger_module.id,
-        )
-        no_target_message = "no linkage targets found in the same device"
+    if not trigger_module.device or trigger_module.device.owner_id is None:
+        return [], "no device owner found for linkage dispatch"
+
+    stmt = (
+        select(Module)
+        .join(Module.device)
+        .where(Device.owner_id == trigger_module.device.owner_id)
+        .order_by(Device.id.asc(), Module.id.asc())
+    )
+    no_target_message = "no linkage targets found for the same owner"
 
     target_modules = list((await db.execute(stmt)).scalars().all())
     return target_modules, no_target_message
