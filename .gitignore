@@ -41,6 +41,8 @@ venv/
 env/
 backend/tests/
 web/tests/
+web/playwright-report/
+web/test-results/
 backend/*.db
 backend/*.db-journal
 backend/pytest-cache-files-*/

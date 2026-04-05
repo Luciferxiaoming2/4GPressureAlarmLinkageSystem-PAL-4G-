@@ -11,7 +11,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    include: ['tests/**/*.spec.ts'],
+    include: ['tests/vitest/**/*.spec.ts'],
+    exclude: ['tests/playwright/**'],
     globals: true,
   },
 })
