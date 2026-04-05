@@ -68,6 +68,66 @@ cd D:\project\code\PAL_4G\backend
 D:\uv\venvs\pal_4g\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
+### 后端环境变量
+
+后端配置文件位于 `backend/.env`。如需接真实 MQTT 或微信小程序能力，请至少补齐以下配置。
+
+MQTT 配置：
+
+```env
+MQTT_ENABLED=true
+MQTT_BROKER_HOST=你的MQTT服务器地址
+MQTT_BROKER_PORT=1883
+MQTT_USERNAME=你的MQTT用户名
+MQTT_PASSWORD=你的MQTT密码
+MQTT_CLIENT_ID=pal_4g_backend
+MQTT_STATUS_TOPIC=pal_4g/status/#
+MQTT_FEEDBACK_TOPIC=pal_4g/feedback/#
+MQTT_COMMAND_TOPIC_PREFIX=pal_4g/commands
+```
+
+微信小程序配置：
+
+```env
+WECHAT_ENABLED=true
+WECHAT_LOGIN_USE_REAL_CODE2SESSION=true
+WECHAT_APP_ID=你的小程序AppID
+WECHAT_APP_SECRET=你的小程序AppSecret
+WECHAT_SUBSCRIBE_TEMPLATE_ID=报警订阅消息模板ID
+WECHAT_SUBSCRIBE_PAGE=pages/alarms/index
+WECHAT_SUBSCRIBE_MINIPROGRAM_STATE=formal
+WECHAT_SUBSCRIBE_LANG=zh_CN
+WECHAT_SUBSCRIBE_FIELD_ALARM_TYPE=thing1
+WECHAT_SUBSCRIBE_FIELD_DEVICE_NAME=thing2
+WECHAT_SUBSCRIBE_FIELD_TRIGGER_TIME=time3
+WECHAT_SUBSCRIBE_FIELD_REMARK=thing4
+ALARM_NOTIFICATION_DISPATCH_INTERVAL_SECONDS=60
+```
+
+你需要提供的微信信息：
+
+- 小程序 `AppID`
+- 小程序 `AppSecret`
+- 订阅消息模板 ID
+- 模板字段 key 名
+- 消息点击后跳转的小程序页面路径
+
+说明：
+
+- `POST /api/v1/auth/wechat-login` 在开启 `WECHAT_LOGIN_USE_REAL_CODE2SESSION=true` 后，会由后端调用微信 `code2Session`
+- `POST /api/v1/auth/wechat-bind` 同时支持真实 `code` 和开发阶段直传 `wechat_open_id`
+- `GET /api/v1/notifications/subscription-status`
+- `POST /api/v1/notifications/subscribe`
+- `POST /api/v1/notifications/unsubscribe`
+- `POST /api/v1/jobs/alarm-notification-dispatch` 可手动触发一次报警订阅消息派发
+
+报警订阅消息派发规则：
+
+- 新报警创建后会进入待发送状态
+- APScheduler 会按 `ALARM_NOTIFICATION_DISPATCH_INTERVAL_SECONDS` 周期扫描待发送报警
+- 只有设备归属用户已绑定微信、用户已开启订阅、系统已配置模板 ID 时才会真正发送
+- 派发结果会记录到报警通知状态字段和通信日志中
+
 ### 启动 Web
 
 ```powershell
