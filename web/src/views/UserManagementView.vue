@@ -38,21 +38,23 @@
             <el-table-column :label="t('users.updatedAt')" min-width="180">
               <template #default="{ row }">{{ formatDateTime(row.updated_at) }}</template>
             </el-table-column>
-            <el-table-column :label="t('common.actions')" min-width="220" fixed="right">
+            <el-table-column :label="t('common.actions')" min-width="320" fixed="right">
               <template #default="{ row }">
-                <el-button link type="primary" :icon="EditPen" @click="openEditDialog(row)">{{ t('common.edit') }}</el-button>
-                <el-button link type="warning" :icon="Key" @click="openResetDialog(row)">{{ t('users.resetPassword') }}</el-button>
-                <el-button v-if="!isCurrentUser(row)" link type="danger" :icon="Delete" @click="handleDeleteUser(row)">
-                  {{ t('common.delete') }}
-                </el-button>
-                <el-button
-                  link
-                  :type="row.is_active ? 'danger' : 'success'"
-                  :icon="row.is_active ? CloseBold : Select"
-                  @click="toggleUserStatus(row)"
-                >
-                  {{ row.is_active ? t('status.device.inactive') : t('status.device.active') }}
-                </el-button>
+                <div class="actions-inline">
+                  <el-button link type="primary" :icon="EditPen" @click="openEditDialog(row)">{{ t('common.edit') }}</el-button>
+                  <el-button link type="warning" :icon="Key" @click="openResetDialog(row)">{{ t('users.resetPassword') }}</el-button>
+                  <el-button v-if="!isCurrentUser(row)" link type="danger" :icon="Delete" @click="handleDeleteUser(row)">
+                    {{ t('common.delete') }}
+                  </el-button>
+                  <el-button
+                    link
+                    :type="row.is_active ? 'danger' : 'success'"
+                    :icon="row.is_active ? CloseBold : Select"
+                    @click="toggleUserStatus(row)"
+                  >
+                    {{ row.is_active ? t('status.device.inactive') : t('status.device.active') }}
+                  </el-button>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -307,3 +309,17 @@ async function handleDeleteUser(user: UserRead) {
 
 void fetchUsers()
 </script>
+
+<style scoped>
+.actions-inline {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.actions-inline :deep(.el-button) {
+  margin-left: 0;
+}
+</style>
