@@ -119,9 +119,10 @@ import PanelCard from '@/components/PanelCard.vue'
 import { useI18n } from '@/composables/useI18n'
 import { useAuthStore } from '@/stores/auth'
 import type { UserCreatePayload, UserRead } from '@/types/domain'
+import { resolveApiErrorMessage } from '@/utils/apiErrors'
 import { formatDateTime } from '@/utils/format'
 
-const { t } = useI18n()
+const { locale, t } = useI18n()
 const authStore = useAuthStore()
 const loading = ref(true)
 const error = ref('')
@@ -183,7 +184,7 @@ async function fetchUsers() {
   try {
     users.value = await getUsersApi()
   } catch (err: any) {
-    error.value = err.response?.data?.detail || t('users.loadError')
+    error.value = resolveApiErrorMessage(err, locale.value, t, t('users.loadError'))
   } finally {
     loading.value = false
   }
@@ -251,7 +252,7 @@ async function submitEdit() {
     editDialogVisible.value = false
     await fetchUsers()
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.detail || t('users.saveFailed'))
+    ElMessage.error(resolveApiErrorMessage(err, locale.value, t, t('users.saveFailed')))
   } finally {
     submitting.value = false
   }
@@ -268,7 +269,7 @@ async function submitReset() {
     resetDialogVisible.value = false
     await fetchUsers()
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.detail || t('users.resetFailed'))
+    ElMessage.error(resolveApiErrorMessage(err, locale.value, t, t('users.resetFailed')))
   } finally {
     submitting.value = false
   }
@@ -282,7 +283,7 @@ async function toggleUserStatus(user: UserRead) {
     ElMessage.success(t('users.statusSuccess'))
     await fetchUsers()
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.detail || t('users.statusFailed'))
+    ElMessage.error(resolveApiErrorMessage(err, locale.value, t, t('users.statusFailed')))
   }
 }
 
@@ -300,7 +301,7 @@ async function handleDeleteUser(user: UserRead) {
     await fetchUsers()
   } catch (err: any) {
     if (err === 'cancel' || err?.message === 'cancel') return
-    ElMessage.error(err.response?.data?.detail || t('users.deleteFailed'))
+    ElMessage.error(resolveApiErrorMessage(err, locale.value, t, t('users.deleteFailed')))
   }
 }
 

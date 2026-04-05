@@ -159,11 +159,12 @@ import type {
   DashboardRelayCommandItem,
   RealtimeEventMessage,
 } from '@/types/domain'
+import { resolveApiErrorMessage } from '@/utils/apiErrors'
 import { formatDateTime } from '@/utils/format'
 import { resolveAlarmTypeLabel, resolveRelayTargetLabel } from '@/utils/labels'
 import { alarmStatusMeta, commandStatusMeta, deviceStatusMeta } from '@/utils/status'
 
-const { t } = useI18n()
+const { locale, t } = useI18n()
 const authStore = useAuthStore()
 const loading = ref(true)
 const error = ref('')
@@ -224,7 +225,7 @@ async function refreshAll() {
     recentAlarms.value = alarmsData
     recentCommands.value = commandsData
   } catch (err: any) {
-    error.value = err.response?.data?.detail || t('dashboard.loadError')
+    error.value = resolveApiErrorMessage(err, locale.value, t, t('dashboard.loadError'))
   } finally {
     loading.value = false
   }

@@ -113,11 +113,12 @@ import StatusPill from '@/components/StatusPill.vue'
 import { useI18n } from '@/composables/useI18n'
 import { useRealtime } from '@/composables/useRealtime'
 import type { DashboardAlarmItem, RealtimeEventMessage } from '@/types/domain'
+import { resolveApiErrorMessage } from '@/utils/apiErrors'
 import { formatDateTime } from '@/utils/format'
 import { resolveAlarmTypeLabel } from '@/utils/labels'
 import { alarmStatusMeta, linkageStatusMeta } from '@/utils/status'
 
-const { t } = useI18n()
+const { locale, t } = useI18n()
 const loading = ref(true)
 const error = ref('')
 const currentPage = ref(1)
@@ -172,7 +173,7 @@ async function fetchPage(page = 1) {
     items.value = data.items
     paginationTotal.value = data.pagination.total
   } catch (err: any) {
-    error.value = err.response?.data?.detail || t('alarms.loadError')
+    error.value = resolveApiErrorMessage(err, locale.value, t, t('alarms.loadError'))
   } finally {
     loading.value = false
   }

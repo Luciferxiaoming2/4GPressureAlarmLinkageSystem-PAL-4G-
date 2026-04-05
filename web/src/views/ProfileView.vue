@@ -83,9 +83,10 @@ import { changePasswordApi } from '@/api/users'
 import PanelCard from '@/components/PanelCard.vue'
 import { useI18n } from '@/composables/useI18n'
 import { useAuthStore } from '@/stores/auth'
+import { resolveApiErrorMessage } from '@/utils/apiErrors'
 
 const authStore = useAuthStore()
-const { t } = useI18n()
+const { locale, t } = useI18n()
 const router = useRouter()
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
@@ -136,7 +137,7 @@ async function handleSubmit() {
     authStore.logout()
     await router.push('/login')
   } catch (err: any) {
-    errorMessage.value = err.response?.data?.detail || t('profile.changePasswordFailed')
+    errorMessage.value = resolveApiErrorMessage(err, locale.value, t, t('profile.changePasswordFailed'))
   } finally {
     submitting.value = false
   }

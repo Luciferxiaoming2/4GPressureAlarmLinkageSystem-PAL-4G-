@@ -102,9 +102,10 @@ import MetricCard from '@/components/MetricCard.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import { useI18n } from '@/composables/useI18n'
 import type { CommunicationLogRead, LogsOverview, OperationLogRead, RuntimeLogRead } from '@/types/domain'
+import { resolveApiErrorMessage } from '@/utils/apiErrors'
 import { formatDateTime } from '@/utils/format'
 
-const { t } = useI18n()
+const { locale, t } = useI18n()
 const activeTab = ref<'runtime' | 'operations' | 'communication'>('runtime')
 const loading = ref(true)
 const error = ref('')
@@ -135,7 +136,7 @@ async function refreshAll(nextPage = 1) {
     await fetchOverview()
     await fetchActive(nextPage)
   } catch (err: any) {
-    error.value = err.response?.data?.detail || t('logs.loadError')
+    error.value = resolveApiErrorMessage(err, locale.value, t, t('logs.loadError'))
     loading.value = false
   }
 }
@@ -180,7 +181,7 @@ async function fetchActive(nextPage = 1) {
       page.total = data.total
     }
   } catch (err: any) {
-    error.value = err.response?.data?.detail || t('logs.loadError')
+    error.value = resolveApiErrorMessage(err, locale.value, t, t('logs.loadError'))
   } finally {
     loading.value = false
   }

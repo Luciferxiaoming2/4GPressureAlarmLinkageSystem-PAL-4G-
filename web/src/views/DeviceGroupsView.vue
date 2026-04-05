@@ -79,8 +79,9 @@ import {
 } from '@/api/devices'
 import { getUsersApi } from '@/api/users'
 import type { DeviceGroupRead, UserRead } from '@/types/domain'
+import { resolveApiErrorMessage } from '@/utils/apiErrors'
 
-const { t } = useI18n()
+const { locale, t } = useI18n()
 const loading = ref(true)
 const error = ref('')
 const groups = ref<DeviceGroupRead[]>([])
@@ -115,7 +116,7 @@ async function fetchAll() {
     groups.value = groupData
     users.value = userData
   } catch (err: any) {
-    error.value = err.response?.data?.detail || t('groups.loadError')
+    error.value = resolveApiErrorMessage(err, locale.value, t, t('groups.loadError'))
   } finally {
     loading.value = false
   }
@@ -152,7 +153,7 @@ async function submitGroup() {
     dialogVisible.value = false
     await fetchAll()
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.detail || t('groups.saveFailed'))
+    ElMessage.error(resolveApiErrorMessage(err, locale.value, t, t('groups.saveFailed')))
   } finally {
     submitting.value = false
   }
@@ -168,7 +169,7 @@ async function removeGroup(groupId: number) {
     await fetchAll()
   } catch (err: any) {
     if (err === 'cancel') return
-    ElMessage.error(err.response?.data?.detail || t('groups.deleteFailed'))
+    ElMessage.error(resolveApiErrorMessage(err, locale.value, t, t('groups.deleteFailed')))
   }
 }
 

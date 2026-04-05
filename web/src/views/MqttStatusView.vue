@@ -53,8 +53,9 @@ import DataState from '@/components/DataState.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import { useI18n } from '@/composables/useI18n'
 import type { MqttClientStatus } from '@/types/domain'
+import { resolveApiErrorMessage } from '@/utils/apiErrors'
 
-const { t } = useI18n()
+const { locale, t } = useI18n()
 const loading = ref(true)
 const error = ref('')
 const status = ref<MqttClientStatus | null>(null)
@@ -65,7 +66,7 @@ async function fetchStatus() {
   try {
     status.value = await getMqttStatusApi()
   } catch (err: any) {
-    error.value = err.response?.data?.detail || t('mqtt.loadError')
+    error.value = resolveApiErrorMessage(err, locale.value, t, t('mqtt.loadError'))
   } finally {
     loading.value = false
   }

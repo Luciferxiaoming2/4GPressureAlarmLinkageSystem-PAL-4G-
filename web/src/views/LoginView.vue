@@ -68,9 +68,10 @@ import { useRoute, useRouter } from 'vue-router'
 import PanelCard from '@/components/PanelCard.vue'
 import { useI18n } from '@/composables/useI18n'
 import { useAuthStore } from '@/stores/auth'
+import { resolveApiErrorMessage } from '@/utils/apiErrors'
 
 const authStore = useAuthStore()
-const { t } = useI18n()
+const { locale, t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const isEnglish = computed(() => t('common.language') === 'Language')
@@ -121,7 +122,7 @@ async function handleSubmit() {
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/dashboard'
     await router.push(redirect)
   } catch (error: any) {
-    errorMessage.value = error.response?.data?.detail || t('auth.loginError')
+    errorMessage.value = resolveApiErrorMessage(error, locale.value, t, t('auth.loginError'))
   }
 }
 </script>

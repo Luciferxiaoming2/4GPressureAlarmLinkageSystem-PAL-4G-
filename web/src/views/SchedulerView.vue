@@ -85,9 +85,10 @@ import DataState from '@/components/DataState.vue'
 import PanelCard from '@/components/PanelCard.vue'
 import { useI18n } from '@/composables/useI18n'
 import type { DatabaseBackupFileRead, JobExecutionLogRead, SchedulerStatus } from '@/types/domain'
+import { resolveApiErrorMessage } from '@/utils/apiErrors'
 import { formatDateTime } from '@/utils/format'
 
-const { t } = useI18n()
+const { locale, t } = useI18n()
 const loading = ref(true)
 const error = ref('')
 const scheduler = ref<SchedulerStatus | null>(null)
@@ -108,7 +109,7 @@ async function refreshAll() {
     history.value = historyData
     backups.value = backupData
   } catch (err: any) {
-    error.value = err.response?.data?.detail || t('scheduler.loadError')
+    error.value = resolveApiErrorMessage(err, locale.value, t, t('scheduler.loadError'))
   } finally {
     loading.value = false
   }
@@ -126,7 +127,7 @@ async function runJob(kind: typeof runningJob.value) {
     ElMessage.success(t('scheduler.runSuccess'))
     await refreshAll()
   } catch (err: any) {
-    ElMessage.error(err.response?.data?.detail || t('scheduler.runFailed'))
+    ElMessage.error(resolveApiErrorMessage(err, locale.value, t, t('scheduler.runFailed')))
   } finally {
     runningJob.value = ''
   }
