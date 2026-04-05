@@ -25,7 +25,7 @@
             </div>
             <div class="kv-item">
               <div class="kv-item__label">{{ t('deviceDetail.fields.serial') }}</div>
-              <div class="kv-item__value mono">{{ detail?.serial_number }}</div>
+              <div class="kv-item__value mono">{{ detail?.serial_number || '--' }}</div>
             </div>
             <div class="kv-item">
               <div class="kv-item__label">{{ t('deviceDetail.fields.status') }}</div>
@@ -34,12 +34,16 @@
               </div>
             </div>
             <div class="kv-item">
-              <div class="kv-item__label">设备联动范围</div>
+              <div class="kv-item__label">联动范围</div>
               <div class="kv-item__value">同管理者名下全部设备</div>
             </div>
             <div class="kv-item">
               <div class="kv-item__label">在线状态</div>
-              <div class="kv-item__value">{{ primaryModule?.is_online ? '在线' : '离线' }}</div>
+              <div class="kv-item__value">{{ runtimeNode?.is_online ? '在线' : '离线' }}</div>
+            </div>
+            <div class="kv-item">
+              <div class="kv-item__label">最近在线时间</div>
+              <div class="kv-item__value">{{ formatDateTime(runtimeNode?.last_seen_at) }}</div>
             </div>
             <div class="kv-item">
               <div class="kv-item__label">{{ t('deviceDetail.fields.latestAlarm') }}</div>
@@ -52,13 +56,13 @@
           </div>
         </PanelCard>
 
-        <PanelCard :title="t('deviceDetail.controlTitle')" :description="t('deviceDetail.controlDesc')">
-          <DataState :empty="!primaryModule" :empty-text="t('deviceDetail.controlEmpty')">
-            <div class="page-grid module-grid">
+        <PanelCard title="设备控制" description="对当前设备发送开关控制命令，提交后会自动刷新状态。">
+          <DataState :empty="!runtimeNode" empty-text="当前设备暂无可用运行通道">
+            <div class="page-grid runtime-grid">
               <ModuleControlCard
-                v-if="primaryModule"
-                :module="primaryModule"
-                :loading-state="pendingControls[primaryModule.id] || ''"
+                v-if="runtimeNode"
+                :module="runtimeNode"
+                :loading-state="pendingControls[runtimeNode.id] || ''"
                 @control="handleControl"
               />
             </div>
@@ -67,7 +71,7 @@
       </div>
 
       <div class="page-grid detail-grid">
-        <PanelCard :title="t('deviceDetail.manageTitle')" :description="t('deviceDetail.manageDesc')">
+        <PanelCard title="设备信息" description="维护设备基础信息，查看归属和业务状态。">
           <div class="kv-list">
             <div class="kv-item">
               <div class="kv-item__label">{{ t('devices.nameLabel') }}</div>
@@ -84,10 +88,6 @@
             <div class="kv-item">
               <div class="kv-item__label">{{ t('devices.owner') }}</div>
               <div class="kv-item__value">{{ detail?.owner_id ?? '--' }}</div>
-            </div>
-            <div class="kv-item">
-              <div class="kv-item__label">最近在线时间</div>
-              <div class="kv-item__value">{{ formatDateTime(primaryModule?.last_seen_at) }}</div>
             </div>
           </div>
         </PanelCard>
@@ -168,7 +168,6 @@
         </el-button>
       </template>
     </el-dialog>
-
   </div>
 </template>
 
@@ -179,12 +178,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { getDashboardDeviceDetailApi } from '@/api/dashboard'
-import {
-  createRelayCommandApi,
-  deleteDeviceApi,
-  getDeviceApi,
-  updateDeviceApi,
-} from '@/api/devices'
+import { createRelayCommandApi, deleteDeviceApi, getDeviceApi, updateDeviceApi } from '@/api/devices'
 import DataState from '@/components/DataState.vue'
 import ModuleControlCard from '@/components/ModuleControlCard.vue'
 import PanelCard from '@/components/PanelCard.vue'
@@ -195,11 +189,7 @@ import { useRealtime } from '@/composables/useRealtime'
 import { useAuthStore } from '@/stores/auth'
 import type { DashboardDeviceDetail, DeviceRead, RealtimeEventMessage } from '@/types/domain'
 import { formatDateTime } from '@/utils/format'
-import {
-  resolveAlarmTypeLabel,
-  resolveDeviceBusinessStatusLabel,
-  resolveRelayTargetLabel,
-} from '@/utils/labels'
+import { resolveAlarmTypeLabel, resolveDeviceBusinessStatusLabel, resolveRelayTargetLabel } from '@/utils/labels'
 import { alarmStatusMeta, commandStatusMeta, deviceStatusMeta } from '@/utils/status'
 
 const route = useRoute()
@@ -227,8 +217,8 @@ const deviceRules: FormRules<typeof deviceForm> = {
 const deviceId = Number(route.params.id)
 const isAdmin = computed(() => authStore.profile?.role === 'super_admin')
 const canManageDevice = computed(() => Boolean(authStore.profile))
-const primaryModule = computed(() => device.value?.modules?.[0] ?? null)
-const moduleIds = computed(() => new Set((device.value?.modules ?? []).map((item) => item.id)))
+const runtimeNode = computed(() => device.value?.modules?.[0] ?? null)
+const runtimeNodeIds = computed(() => new Set((device.value?.modules ?? []).map((item) => item.id)))
 const realtimeRefreshEvents = new Set([
   'module.status_updated',
   'alarm.created',
@@ -261,7 +251,7 @@ function isRealtimeEventForCurrentDevice(message: RealtimeEventMessage) {
   }
 
   const eventModuleId = resolveNumericField(message.data.module_id)
-  return eventModuleId !== null && moduleIds.value.has(eventModuleId)
+  return eventModuleId !== null && runtimeNodeIds.value.has(eventModuleId)
 }
 
 function scheduleRealtimeRefresh() {
@@ -382,13 +372,13 @@ onBeforeUnmount(() => {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.module-grid {
+.runtime-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 @media (max-width: 1200px) {
   .detail-grid,
-  .module-grid {
+  .runtime-grid {
     grid-template-columns: 1fr;
   }
 }

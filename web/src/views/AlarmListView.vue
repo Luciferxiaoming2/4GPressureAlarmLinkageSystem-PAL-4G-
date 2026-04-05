@@ -60,6 +60,7 @@
         <div class="data-table">
           <el-table :data="filteredItems">
             <el-table-column prop="device_name" :label="t('alarms.table.deviceName')" min-width="180" />
+            <el-table-column prop="device_id" label="设备编号" min-width="100" />
             <el-table-column :label="t('alarms.table.alarmType')" min-width="120">
               <template #default="{ row }">
                 {{ resolveAlarmTypeLabel(row.alarm_type, t) }}

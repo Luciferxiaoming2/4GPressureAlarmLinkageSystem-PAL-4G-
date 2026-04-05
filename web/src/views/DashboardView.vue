@@ -11,13 +11,8 @@
     <DataState :loading="loading" :error="error" @retry="refreshAll">
       <div class="dashboard-grid dashboard-grid--metrics">
         <MetricCard :title="t('dashboard.metrics.devices')" :value="home?.overview.total_devices ?? 0" :tag-label="t('dashboard.metrics.deviceTag')" />
-        <MetricCard :title="'已归属设备'" :value="home?.statistics.owned_devices ?? 0" :tag-label="t('dashboard.metrics.deviceTag')" />
-        <MetricCard
-          :title="'在线设备'"
-          :value="home?.overview.online_modules ?? 0"
-          :tag-label="t('dashboard.metrics.onlineTag')"
-          tag-type="success"
-        />
+        <MetricCard title="已归属设备" :value="home?.statistics.owned_devices ?? 0" :tag-label="t('dashboard.metrics.deviceTag')" />
+        <MetricCard title="在线设备" :value="home?.overview.online_modules ?? 0" :tag-label="t('dashboard.metrics.onlineTag')" tag-type="success" />
         <MetricCard
           :title="t('dashboard.metrics.currentAlarms')"
           :value="home?.recent_alarm_count ?? 0"
@@ -29,12 +24,12 @@
       <template v-if="isManagerDashboard">
         <PanelCard title="我的设备" description="按设备查看实时在线状态、继电器状态和最近报警。">
           <template #header>
-            <span class="dashboard-polling-hint">30 秒轮询，WebSocket 事件到达后会自动刷新</span>
+            <span class="dashboard-polling-hint">30 秒轮询，收到实时事件后会自动刷新</span>
           </template>
 
-          <DataState :empty="!modulePanels.length" empty-text="当前账号下暂无设备数据">
+          <DataState :empty="!devicePanels.length" empty-text="当前账号下暂无设备数据">
             <div class="module-panel-grid">
-              <ModuleOverviewCard v-for="item in modulePanels" :key="item.module_id" :item="item" />
+              <ModuleOverviewCard v-for="item in devicePanels" :key="item.module_id" :item="item" />
             </div>
           </DataState>
         </PanelCard>
@@ -178,7 +173,7 @@ const recentAlarms = ref<DashboardAlarmItem[]>([])
 const recentCommands = ref<DashboardRelayCommandItem[]>([])
 
 const isManagerDashboard = computed(() => authStore.profile?.role === 'manager')
-const modulePanels = computed(() => home.value?.module_panels ?? [])
+const devicePanels = computed(() => home.value?.module_panels ?? [])
 const realtimeRefreshEvents = new Set([
   'module.status_updated',
   'alarm.created',

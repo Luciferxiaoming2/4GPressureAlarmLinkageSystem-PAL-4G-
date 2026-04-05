@@ -27,7 +27,7 @@ export interface RealtimeEventMessage {
   data: Record<string, unknown>
 }
 
-export interface ModuleRead {
+export interface DeviceRuntimeRead {
   id: number
   module_code: string
   relay_state: boolean
@@ -36,6 +36,8 @@ export interface ModuleRead {
   voltage_value: number | null
   last_seen_at: string | null
 }
+
+export type ModuleRead = DeviceRuntimeRead
 
 export interface DeviceRead {
   id: number
@@ -46,7 +48,7 @@ export interface DeviceRead {
   linkage_group_id: number | null
   created_at: string
   updated_at: string
-  modules: ModuleRead[]
+  modules: DeviceRuntimeRead[]
 }
 
 export interface DeviceBindPayload {
@@ -115,12 +117,12 @@ export interface DashboardHome {
   overview: DeviceOverview
   statistics: DeviceStatistics
   monitoring: DeviceMonitoringItem[]
-  module_panels: DashboardModulePanelItem[]
+  module_panels: DashboardDevicePanelItem[]
   recent_alarm_count: number
   pending_command_count: number
 }
 
-export interface DashboardModulePanelItem {
+export interface DashboardDevicePanelItem {
   module_id: number
   device_id: number
   device_name: string
@@ -134,6 +136,8 @@ export interface DashboardModulePanelItem {
   latest_alarm_type: string | null
   latest_alarm_time: string | null
 }
+
+export type DashboardModulePanelItem = DashboardDevicePanelItem
 
 export interface DashboardTrendPoint {
   label: string
