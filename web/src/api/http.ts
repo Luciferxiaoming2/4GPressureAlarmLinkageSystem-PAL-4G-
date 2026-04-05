@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { localizeErrorDetail, localizeTransportError } from '@/utils/errorMessage'
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1'
 const TOKEN_KEY = 'pal4g-access-token'
@@ -31,6 +32,12 @@ http.interceptors.request.use((config) => {
 http.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.response?.data) {
+      error.response.data.detail = localizeErrorDetail(error.response.data.detail)
+    } else if (typeof error.message === 'string') {
+      error.message = localizeTransportError(error.message)
+    }
+
     if (error.response?.status === 401) {
       tokenStorage.clear()
       if (window.location.pathname !== '/login') {
