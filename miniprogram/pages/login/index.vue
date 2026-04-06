@@ -29,14 +29,23 @@
 
       <view class="form-field">
         <text class="form-label">密码</text>
-        <input
-          v-model="form.password"
-          class="form-input"
-          password
-          placeholder="请输入密码"
-          confirm-type="done"
-          @confirm="handleLogin"
-        />
+        <view class="password-field">
+          <input
+            v-model="form.password"
+            class="form-input password-field__input"
+            :password="!passwordVisible"
+            placeholder="请输入密码"
+            confirm-type="done"
+            @confirm="handleLogin"
+          />
+          <button class="password-field__toggle" @click="togglePasswordVisible">
+            <image
+              class="password-field__toggle-icon"
+              :src="passwordVisible ? '/static/icons/eye-open.svg' : '/static/icons/eye-close.svg'"
+              mode="aspectFit"
+            />
+          </button>
+        </view>
       </view>
 
       <button class="primary-button login-submit" :loading="authStore.state.loading" @click="handleLogin">
@@ -73,6 +82,7 @@ const form = reactive({
 })
 const wechatBindMode = ref(false)
 const wechatLoading = ref(false)
+const passwordVisible = ref(false)
 
 async function redirectIfLoggedIn() {
   await authStore.initialize()
@@ -160,6 +170,10 @@ function cancelWechatBindMode() {
   wechatBindMode.value = false
 }
 
+function togglePasswordVisible() {
+  passwordVisible.value = !passwordVisible.value
+}
+
 onShow(() => {
   void redirectIfLoggedIn()
 })
@@ -224,6 +238,42 @@ onShow(() => {
 
 .login-bind-cancel {
   margin-top: 16rpx;
+}
+
+.password-field {
+  position: relative;
+}
+
+.password-field__input {
+  padding-right: 128rpx;
+}
+
+.password-field__toggle {
+  position: absolute;
+  top: 50%;
+  right: 16rpx;
+  transform: translateY(-50%);
+  min-width: 96rpx;
+  min-height: 58rpx;
+  padding: 0 18rpx;
+  border-radius: 999rpx;
+  border: 0;
+  background: rgba(22, 93, 255, 0.08);
+  color: #165dff;
+  font-size: 22rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.password-field__toggle::after {
+  border: 0;
+}
+
+.password-field__toggle-icon {
+  width: 34rpx;
+  height: 34rpx;
 }
 
 .login-submit {

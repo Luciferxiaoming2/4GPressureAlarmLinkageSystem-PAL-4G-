@@ -4,13 +4,13 @@
 
 当前项目本地联调默认使用以下端口：
 
-- 后端接口服务：`http://127.0.0.1:8000`
+- 后端接口服务：`http://127.0.0.1:8001`
 - Web 前端开发服务：`http://127.0.0.1:5173`
-- 后端 Swagger：`http://127.0.0.1:8000/docs`
+- 后端 Swagger：`http://127.0.0.1:8001/docs`
 
 说明：
 
-- 前端通过 `5173` 访问页面，并请求 `8000` 后端接口
+- 前端通过 `5173` 访问页面，并请求 `8001` 后端接口
 - 若需进行前后端联调，请先分别启动 `web` 与 `backend`
 
 ## 项目结构
@@ -65,7 +65,7 @@ PAL_4G/
 
 ```powershell
 cd D:\project\code\PAL_4G\backend
-D:\uv\venvs\pal_4g\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+D:\uv\venvs\pal_4g\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001
 ```
 
 ### 后端环境变量
