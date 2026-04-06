@@ -12,6 +12,7 @@ from app.api.routes.notifications import router as notifications_router
 from app.api.routes.protocols import router as protocols_router
 from app.api.routes.realtime import router as realtime_router
 from app.api.routes.relay_commands import router as relay_commands_router
+from app.api.routes.usr_cloud import router as usr_cloud_router
 from app.api.routes.users import router as users_router
 
 api_router = APIRouter()
@@ -27,4 +28,5 @@ api_router.include_router(notifications_router, prefix="/notifications", tags=["
 api_router.include_router(protocols_router, prefix="/protocols", tags=["protocols"])
 api_router.include_router(realtime_router, prefix="/ws", tags=["realtime"])
 api_router.include_router(relay_commands_router, prefix="/relay-commands", tags=["relay-commands"])
+api_router.include_router(usr_cloud_router, prefix="/usr-cloud", tags=["usr-cloud"])
 api_router.include_router(users_router, prefix="/users", tags=["users"])

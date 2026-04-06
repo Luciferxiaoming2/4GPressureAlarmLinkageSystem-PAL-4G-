@@ -26,6 +26,28 @@ class Settings(BaseSettings):
     MQTT_COMMAND_TOPIC_PREFIX: str = "pal_4g/commands"
     MQTT_ENABLED: bool = False
 
+    USR_CLOUD_ENABLED: bool = False
+    USR_CLOUD_API_BASE_URL: str = "https://cloudapi.usr.cn"
+    USR_CLOUD_APP_KEY: str = ""
+    USR_CLOUD_APP_SECRET: str = ""
+    USR_CLOUD_ACCOUNT: str = ""
+    USR_CLOUD_PASSWORD: str = ""
+    USR_CLOUD_TOKEN_EXPIRE_SECONDS: int = 7200
+    USR_CLOUD_DEVICE_LIST_PATH: str = "/usrCloud/device/list"
+    USR_CLOUD_DEVICE_DETAIL_PATH: str = "/usrCloud/device/info"
+    USR_CLOUD_PROJECT_ID: str = ""
+    USR_CLOUD_DEVICE_ID: str = ""
+    USR_CLOUD_DEVICE_NO: str = ""
+    USR_CLOUD_CUSDEVICE_NO: str = ""
+    USR_CLOUD_GATEWAY_ID: str = ""
+    USR_CLOUD_GATEWAY_CLIENT_ID: str = ""
+    USR_CLOUD_GATEWAY_PASSWORD: str = ""
+    USR_CLOUD_GATEWAY_MQTT_HOST: str = ""
+    USR_CLOUD_GATEWAY_MQTT_PORT: int = 1883
+    USR_CLOUD_HTTP_PUSH_ENABLED: bool = False
+    USR_CLOUD_HTTP_PUSH_CALLBACK_URL: str = ""
+    USR_CLOUD_HTTP_PUSH_VERIFY_TOKEN: str = ""
+
     LOG_LEVEL: str = "INFO"
     LOG_ROOT_DIR: str = "logs"
     BACKUP_ROOT_DIR: str = "backups"
