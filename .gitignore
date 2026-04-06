@@ -57,6 +57,7 @@ build/
 tmp/
 temp/
 local-sim/
+docs/真机接入资料清单（硬件直接对接网站）.md
 
 # Local docs templates
 docs/python项目开发经验（环境uv）.md

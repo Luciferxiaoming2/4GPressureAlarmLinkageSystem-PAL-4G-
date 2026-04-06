@@ -9,7 +9,9 @@ from sqlalchemy.pool import StaticPool
 from app.api import api_router
 from app.core.config import settings
 from app.db.base import Base
+from app.db import session as db_session
 from app.db.session import get_db
+from app.services import mqtt_client_service as mqtt_client_service_module
 from app.services import scheduler_service
 from app.services.user_service import ensure_default_admin
 
@@ -41,6 +43,8 @@ def client():
 
     asyncio.run(prepare_database())
     scheduler_service.AsyncSessionLocal = session_factory
+    db_session.AsyncSessionLocal = session_factory
+    mqtt_client_service_module.AsyncSessionLocal = session_factory
 
     app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION)
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
