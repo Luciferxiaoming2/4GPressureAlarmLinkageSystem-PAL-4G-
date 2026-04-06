@@ -60,6 +60,7 @@ local-sim/
 local-sim/miniprogram-tests/
 docs/真机接入资料清单（硬件直接对接网站）.md
 docs/微信小程序真机调试解决方案.md
+docs/小程序自动化测试方案.md
 
 # Local docs templates
 docs/python项目开发经验（环境uv）.md
