@@ -21,32 +21,11 @@ class Settings(BaseSettings):
     MQTT_USERNAME: str = ""
     MQTT_PASSWORD: str = ""
     MQTT_CLIENT_ID: str = "pal_4g_backend"
-    MQTT_STATUS_TOPIC: str = "pal_4g/status/#"
-    MQTT_FEEDBACK_TOPIC: str = "pal_4g/feedback/#"
-    MQTT_COMMAND_TOPIC_PREFIX: str = "pal_4g/commands"
+    MQTT_STATUS_TOPIC: str = "pal4g/devices/+/status"
+    MQTT_ALARM_TOPIC: str = "pal4g/devices/+/alarm"
+    MQTT_FEEDBACK_TOPIC: str = "pal4g/devices/+/feedback"
+    MQTT_COMMAND_TOPIC_PREFIX: str = "pal4g/devices"
     MQTT_ENABLED: bool = False
-
-    USR_CLOUD_ENABLED: bool = False
-    USR_CLOUD_API_BASE_URL: str = "https://cloudapi.usr.cn"
-    USR_CLOUD_APP_KEY: str = ""
-    USR_CLOUD_APP_SECRET: str = ""
-    USR_CLOUD_ACCOUNT: str = ""
-    USR_CLOUD_PASSWORD: str = ""
-    USR_CLOUD_TOKEN_EXPIRE_SECONDS: int = 7200
-    USR_CLOUD_DEVICE_LIST_PATH: str = "/usrCloud/device/list"
-    USR_CLOUD_DEVICE_DETAIL_PATH: str = "/usrCloud/device/info"
-    USR_CLOUD_PROJECT_ID: str = ""
-    USR_CLOUD_DEVICE_ID: str = ""
-    USR_CLOUD_DEVICE_NO: str = ""
-    USR_CLOUD_CUSDEVICE_NO: str = ""
-    USR_CLOUD_GATEWAY_ID: str = ""
-    USR_CLOUD_GATEWAY_CLIENT_ID: str = ""
-    USR_CLOUD_GATEWAY_PASSWORD: str = ""
-    USR_CLOUD_GATEWAY_MQTT_HOST: str = ""
-    USR_CLOUD_GATEWAY_MQTT_PORT: int = 1883
-    USR_CLOUD_HTTP_PUSH_ENABLED: bool = False
-    USR_CLOUD_HTTP_PUSH_CALLBACK_URL: str = ""
-    USR_CLOUD_HTTP_PUSH_VERIFY_TOKEN: str = ""
 
     LOG_LEVEL: str = "INFO"
     LOG_ROOT_DIR: str = "logs"
@@ -80,6 +59,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
+        extra="ignore",
     )
 
     @property
