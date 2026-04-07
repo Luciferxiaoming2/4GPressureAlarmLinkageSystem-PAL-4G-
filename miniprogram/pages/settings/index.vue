@@ -94,27 +94,12 @@ const passwordForm = reactive({
   confirmPassword: '',
 })
 
-const templateIdText = computed(() => {
-  const templateIds = subscriptionStore.state.availableTemplateIds?.length
-    ? subscriptionStore.state.availableTemplateIds
-    : subscriptionStore.state.templateIds
-
-  if (!templateIds?.length) {
-    return '尚未同步到模板编号'
-  }
-  return templateIds.join('、')
-})
-
 const subscriptionDescription = computed(() => {
   if (subscriptionStore.state.enabled) {
     return `已授权，最近更新时间 ${formatDateTime(subscriptionStore.state.updatedAt, '刚刚')}`
   }
 
-  if (templateIdText.value === '尚未同步到模板编号') {
-    return '当前没有可用模板编号，请先由后端或管理员补充配置。'
-  }
-
-  return `当前可用模板：${templateIdText.value}`
+  return '授权后可以在微信内接收报警提醒。'
 })
 
 onShow(() => {

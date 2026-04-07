@@ -55,13 +55,6 @@
       <button class="secondary-button login-wechat" :loading="wechatLoading" @click="handleWechatLogin">
         {{ wechatBindMode ? '重新获取微信授权' : '微信授权登录' }}
       </button>
-
-      <view class="login-tips">
-        <text class="login-tips__title">当前版本说明</text>
-        <text class="login-tips__item">1. 账号密码登录已可直接联调后端。</text>
-        <text class="login-tips__item">2. 微信授权登录已接通，未绑定账号时可在本页直接完成绑定。</text>
-        <text class="login-tips__item">3. 订阅模板会优先读取后端配置，前端本地配置仅作为开发兜底。</text>
-      </view>
     </view>
   </view>
 </template>
@@ -83,6 +76,7 @@ const form = reactive({
 const wechatBindMode = ref(false)
 const wechatLoading = ref(false)
 const passwordVisible = ref(false)
+const pendingWechatCode = ref('')
 
 async function redirectIfLoggedIn() {
   await authStore.initialize()
@@ -94,8 +88,18 @@ async function redirectIfLoggedIn() {
 }
 
 async function bindCurrentWechatAfterLogin() {
-  const code = await requestWechatLoginCode()
-  await wechatBindApi({ code })
+  let code = pendingWechatCode.value || await requestWechatLoginCode()
+  try {
+    await wechatBindApi({ code })
+  } catch (error) {
+    if (pendingWechatCode.value) {
+      code = await requestWechatLoginCode()
+      await wechatBindApi({ code })
+    } else {
+      throw error
+    }
+  }
+  pendingWechatCode.value = ''
   await authStore.fetchProfile()
 }
 
@@ -140,7 +144,9 @@ async function handleWechatLogin() {
   wechatLoading.value = true
   try {
     const code = await requestWechatLoginCode()
+    pendingWechatCode.value = code
     await authStore.loginWithWechat({ code })
+    pendingWechatCode.value = ''
     wechatBindMode.value = false
     uni.showToast({
       title: '微信登录成功',
@@ -152,14 +158,14 @@ async function handleWechatLogin() {
   } catch (error) {
     if (Number(error?.statusCode || 0) === 404) {
       wechatBindMode.value = true
-      uni.showModal({
-        title: '微信未绑定账号',
-        content: '请继续输入已有设备账号和密码，登录成功后会自动完成微信绑定。',
-        showCancel: false,
+      uni.showToast({
+        title: '请输入账号密码完成绑定',
+        icon: 'none',
       })
       return
     }
 
+    pendingWechatCode.value = ''
     showRequestError(error, '微信登录失败，请稍后重试')
   } finally {
     wechatLoading.value = false
@@ -168,6 +174,7 @@ async function handleWechatLogin() {
 
 function cancelWechatBindMode() {
   wechatBindMode.value = false
+  pendingWechatCode.value = ''
 }
 
 function togglePasswordVisible() {

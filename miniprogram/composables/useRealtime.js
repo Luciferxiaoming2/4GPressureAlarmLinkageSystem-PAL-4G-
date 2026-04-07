@@ -42,6 +42,14 @@ function notifyListeners(message) {
   listeners.forEach((listener) => listener(message))
 }
 
+function formatSocketErrorDetail(error) {
+  const message = String(error?.errMsg || error?.message || '').trim()
+  if (!message) {
+    return '实时连接异常'
+  }
+  return message
+}
+
 function startHeartbeat() {
   clearHeartbeat()
   heartbeatTimer = setInterval(() => {
@@ -121,17 +129,18 @@ function connect() {
     }
   })
 
-  socketTask.onClose(() => {
+  socketTask.onClose((event) => {
     clearHeartbeat()
     socketTask = null
     if (!manuallyClosed) {
-      setState('fallback', '实时连接已断开')
+      const closeDetail = [event?.code, event?.reason].filter(Boolean).join(' ')
+      setState('fallback', closeDetail ? `实时连接已断开：${closeDetail}` : '实时连接已断开')
       scheduleReconnect()
     }
   })
 
-  socketTask.onError(() => {
-    setState('error', '实时连接异常')
+  socketTask.onError((error) => {
+    setState('error', formatSocketErrorDetail(error))
     clearHeartbeat()
     socketTask = null
     scheduleReconnect()

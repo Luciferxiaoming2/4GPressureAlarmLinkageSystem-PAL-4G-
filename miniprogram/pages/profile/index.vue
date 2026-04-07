@@ -21,7 +21,7 @@
       <SettingsMenuItem title="账号角色" :value="formatRole(authStore.state.profile?.role)" />
       <SettingsMenuItem title="登录状态" :value="authStore.state.profile?.is_active ? '正常' : '已停用'" />
       <SettingsMenuItem title="微信绑定" :value="authStore.state.profile?.wechat_bound ? '已绑定' : '未绑定'" />
-      <SettingsMenuItem title="实时连接" :value="realtimeLabel" />
+      <SettingsMenuItem title="数据同步" :value="realtimeLabel" />
     </SectionCard>
 
     <SectionCard title="快捷入口" subtitle="设置页集中处理账号安全、通知和会话管理。">
@@ -62,13 +62,13 @@ const profileInitials = computed(() => {
 const realtimeLabel = computed(() => {
   switch (realtime.state.status) {
     case 'connected':
-      return '已连接'
+      return '同步正常'
     case 'connecting':
-      return '连接中'
+      return '同步中'
     case 'error':
-      return '异常'
+      return '同步稍后重试'
     default:
-      return '轮询模式'
+      return '自动同步'
   }
 })
 

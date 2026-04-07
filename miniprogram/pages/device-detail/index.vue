@@ -20,11 +20,13 @@
       <SectionCard title="设备操作" subtitle="支持远程控制，也支持从当前账号中移除该设备。">
         <view class="detail-actions">
           <button class="secondary-button" @click="refreshDetail">刷新状态</button>
-          <button class="danger-button" :loading="unbinding" @click="handleUnbind">移除设备</button>
+          <button class="danger-button" :loading="unbinding" @click="handleUnbind">
+            {{ isSuperAdmin ? '删除设备' : '移除设备' }}
+          </button>
         </view>
       </SectionCard>
 
-      <SectionCard title="设备状态" subtitle="页面会优先使用实时事件更新，异常时自动回退到轮询。">
+      <SectionCard title="设备状态" subtitle="设备状态会自动更新，可直接查看运行通道并进行远程控制。">
         <template v-if="runtimeModules.length">
           <view class="module-list">
             <ModuleCard
@@ -88,16 +90,17 @@
 </template>
 
 <script setup>
-import { onUnmounted, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { onHide, onLoad, onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 
 import EmptyState from '@/components/EmptyState.vue'
 import ModuleCard from '@/components/ModuleCard.vue'
 import SectionCard from '@/components/SectionCard.vue'
 import { getDeviceDashboardDetailApi } from '@/api/dashboard'
-import { getDeviceRuntimeApi, unbindDeviceApi } from '@/api/devices'
+import { deleteDeviceApi, getDeviceRuntimeApi, unbindDeviceApi } from '@/api/devices'
 import { createRelayCommandApi } from '@/api/relay'
 import { useRealtime } from '@/composables/useRealtime'
+import { useAuthStore } from '@/stores/auth'
 import { APP_CONFIG } from '@/utils/config'
 import { showRequestError } from '@/utils/errors'
 import { formatDateTime } from '@/utils/format'
@@ -109,8 +112,8 @@ import {
   getDeviceStatusLabel,
   getRelayTargetLabel,
 } from '@/utils/status'
-
 const realtime = useRealtime()
+const authStore = useAuthStore()
 
 const deviceId = ref(0)
 const loading = ref(false)
@@ -120,6 +123,8 @@ const targetState = ref('')
 const device = ref(null)
 const dashboard = ref(null)
 const runtimeModules = ref([])
+
+const isSuperAdmin = computed(() => authStore.state.profile?.role === 'super_admin')
 
 let stopRealtime = null
 let pollingTimer = null
@@ -201,9 +206,17 @@ function handleToggleRelay(payload) {
 }
 
 function handleUnbind() {
+  const isDeleting = isSuperAdmin.value
+  const title = isDeleting ? '确认删除设备' : '确认移除设备'
+  const content = isDeleting
+    ? '删除后将彻底移除设备及其可删除的关联数据，是否继续？'
+    : '移除后该设备将不会再出现在当前账号的小程序列表中，是否继续？'
+  const successText = isDeleting ? '设备已删除' : '设备已移除'
+  const errorText = isDeleting ? '删除设备失败' : '移除设备失败'
+
   uni.showModal({
-    title: '确认移除设备',
-    content: '移除后该设备将不会再出现在当前账号的小程序列表中，是否继续？',
+    title,
+    content,
     success: async (result) => {
       if (!result.confirm) {
         return
@@ -211,16 +224,20 @@ function handleUnbind() {
 
       unbinding.value = true
       try {
-        await unbindDeviceApi(deviceId.value)
+        if (isDeleting) {
+          await deleteDeviceApi(deviceId.value)
+        } else {
+          await unbindDeviceApi(deviceId.value)
+        }
         uni.showToast({
-          title: '设备已移除',
+          title: successText,
           icon: 'success',
         })
         uni.reLaunch({
           url: '/pages/devices/index',
         })
       } catch (error) {
-        showRequestError(error, '移除设备失败')
+        showRequestError(error, errorText)
       } finally {
         unbinding.value = false
       }

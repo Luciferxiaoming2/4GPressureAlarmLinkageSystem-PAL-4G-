@@ -1,6 +1,7 @@
 const TOKEN_KEY = 'pal4g-miniprogram-token'
 const PROFILE_KEY = 'pal4g-miniprogram-profile'
 const SUBSCRIPTION_KEY = 'pal4g-miniprogram-subscription'
+const SERVICE_ORIGIN_KEY = 'pal4g-miniprogram-service-origin'
 
 export function getToken() {
   return uni.getStorageSync(TOKEN_KEY) || ''
@@ -46,6 +47,18 @@ export function setSubscriptionState(state) {
 
 export function clearSubscriptionState() {
   uni.removeStorageSync(SUBSCRIPTION_KEY)
+}
+
+export function getServiceOrigin() {
+  return String(uni.getStorageSync(SERVICE_ORIGIN_KEY) || '').trim()
+}
+
+export function setServiceOrigin(origin) {
+  uni.setStorageSync(SERVICE_ORIGIN_KEY, origin)
+}
+
+export function clearServiceOrigin() {
+  uni.removeStorageSync(SERVICE_ORIGIN_KEY)
 }
 
 export function clearSessionStorage() {
