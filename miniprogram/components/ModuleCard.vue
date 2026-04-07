@@ -2,8 +2,8 @@
   <view class="panel-card module-card">
     <view class="module-card__head">
       <view>
-        <text class="module-card__title">
-          {{ module.module_code ? `模块 ${module.module_code}` : '设备运行状态' }}
+        <text v-if="module.module_code && String(module.module_code).toUpperCase() !== 'MAIN'" class="module-card__title">
+          {{ `模块 ${module.module_code}` }}
         </text>
         <text class="module-card__serial" v-if="module.serial_number || module.imei">
           {{ module.serial_number ? `SN：${module.serial_number}` : `IMEI：${module.imei}` }}

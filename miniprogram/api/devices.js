@@ -23,3 +23,10 @@ export function unbindDeviceApi(deviceId) {
     method: 'POST',
   })
 }
+
+export function deleteDeviceApi(deviceId) {
+  return request({
+    url: `/devices/${deviceId}`,
+    method: 'DELETE',
+  })
+}

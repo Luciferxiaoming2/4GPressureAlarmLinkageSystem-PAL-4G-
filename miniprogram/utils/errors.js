@@ -8,10 +8,10 @@
   'Could not validate credentials': '登录凭证无效，请重新登录',
   'Network request failed': '网络请求失败，请检查网络连接',
   'Request timeout': '请求超时，请稍后重试',
-  'socket error': '实时连接异常，已切换为轮询模式',
-  'socket closed': '实时连接已断开，已切换为轮询模式',
+  'socket error': '数据同步暂时异常，请稍后刷新重试',
+  'socket closed': '数据同步暂时中断，请稍后刷新重试',
   'missing token': '当前未检测到登录状态，请重新登录',
-  'missing ws url': '实时服务地址未配置，已切换为轮询模式',
+  'missing ws url': '数据同步暂不可用，请稍后重试',
 }
 
 function mapStatusCodeMessage(statusCode, fallback) {
@@ -54,9 +54,11 @@ export function normalizeErrorMessage(message, statusCode, fallback = '') {
   if (
     lower.includes('connection refused') ||
     lower.includes('fail connect') ||
-    lower.includes('unable to resolve host')
+    lower.includes('unable to resolve host') ||
+    lower.includes('websocket') ||
+    lower.includes('sockettask')
   ) {
-    return '无法连接到服务器，请确认后端服务已启动'
+    return '当前连接暂不可用，请稍后重试'
   }
 
   if (

@@ -82,7 +82,7 @@ export function useSubscriptionStore() {
       : APP_CONFIG.SUBSCRIPTION_TEMPLATE_IDS
 
     if (!Array.isArray(availableTemplateIds) || !availableTemplateIds.length) {
-      throw new Error('订阅消息模板尚未配置，请联系管理员补充模板编号')
+      throw new Error('消息通知暂未开放，请联系管理员')
     }
 
     if (typeof uni.requestSubscribeMessage !== 'function') {
